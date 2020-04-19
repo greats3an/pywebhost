@@ -61,21 +61,15 @@ class RequestHandler(server.BaseHTTPRequestHandler):
             if not self.parse_request():
                 # An error code has been sent, just exit
                 return
-            mname = 'do_' + self.command
+            mname = self.command
             if self.headers.get('Upgrade') == 'websocket':
                 # Websocket job,processing these headers.
                 # If processed,it means the request is valid
                 self.ws_ver = self.headers.get('Sec-WebSocket-Version')
                 self.ws_key = self.headers.get('Sec-WebSocket-Key')
                 self.ws_ext = self.headers.get('Sec-WebSocket-Extensions')
-                mname = 'do_WS'
-            if not hasattr(self.parent, mname):
-                self.send_error(
-                    HTTPStatus.NOT_IMPLEMENTED,
-                    "Unsupported method (%r)" % self.command)
-                return
-            method = getattr(self.parent, mname)
-            method(self)
+                mname = 'WS'
+            self.parent.do_METHOD(mname,self)
             # Execute method defined in parent
             # actually send the response if not already done.
             self.wfile.flush()
@@ -397,19 +391,36 @@ class WebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         '''
         return WebsocketSession(caller)
 
-    def do_GET(self, caller: RequestHandler):
-        pass
+    def do_METHOD(self, method,caller: RequestHandler):
+        if not method in self.METHODS.keys():
+            raise Exception("Not supported method %s" % method)
+        if not caller.path in self.METHODS[method].keys():            
+            caller.send_response(404)
+            caller.end_headers()
+            return
+        self.METHODS[method][caller.path](caller)
 
-    def do_POST(self, caller: RequestHandler):
-        pass
-
-    def do_OPTIONS(self, caller: RequestHandler):
-        pass
-
-    def do_WS(self, caller: RequestHandler):
-        pass
+    def path(self,method,path):
+        '''
+        Decorator for path and its methods
+        
+        For example:
+            
+            @server.path('GET','/')
+            def root(caller):
+                caller.send_response(200)
+                caller.end_hedaers()
+                caller.wfile.write('Hello World!')
+        '''
+        def wrapper(func):
+            if not method in self.METHODS.keys():self.METHODS[method] = {}
+            self.METHODS[method][path] = func
+            return func
+        return wrapper
 
     def __init__(self, server_address):
+        # HTTP Methods to be processed
+        self.METHODS = {}
         super().__init__(server_address, lambda *args: RequestHandler(*args, parent=self))
 
 
@@ -443,6 +454,8 @@ class SecureWebServer(WebServer):
 
 
 if __name__ == "__main__":
+    server = WebServer(('localhost', 3331))
+    @server.path('GET','/')
     def GET(caller: RequestHandler):
         caller.send_response(200)
         caller.send_header('Content-Type', 'text/html;encoding=utf-8')
@@ -455,7 +468,8 @@ if __name__ == "__main__":
             </a>
         '''.encode())
         caller.wfile.flush()
-
+    
+    @server.path('WS','/')
     def WS(caller: RequestHandler):
         # Accepts the reqeust
         session = server.accept_websocket(caller)
@@ -466,9 +480,7 @@ if __name__ == "__main__":
             session.send(b'OK.' + frame[-1])
         session.callback_receive = callback_receive
         session.run()
-    server = WebServer(('localhost', 3331))
-    server.do_GET = GET
-    server.do_WS = WS
+
     logging.info('''
     Echo-server serving:
         ws://{0}:{1}
