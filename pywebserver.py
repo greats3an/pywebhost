@@ -6,14 +6,12 @@
 
 import base64
 import hashlib
-import queue
 import random
 import select
 import socket
 import socketserver
 import struct
 import sys
-import threading
 import time
 import typing
 import ssl
@@ -136,7 +134,7 @@ class WebsocketSession():
     def __init__(self, caller: RequestHandler):
         # A request is a socket object,from socketserver
         self.caller = caller
-        self.messages = []
+        self.queue = []
         self.client_address = caller.client_address
         self.keep_alive = True
         # Do handshake
@@ -145,33 +143,33 @@ class WebsocketSession():
             'New Websocket session from %s:%s' % self.caller.client_address)
         super().__init__()
 
+    def handle_once(self):
+        '''Handles IO event for once'''
+        # Using select() to process selectable IOs
+        inputs = (sel:=select.select([self.caller.request], [self.caller.request], [], 1.0))[0]
+        outputs = sel[1]
+        if inputs:
+            # target socket is ready to send,process frame,then callback
+            if (frame:= self.receive()):
+                if frame[4] == WebsocketOPCODE.CLOSE_CONN:
+                    # client requested to close connection
+                    self.send_nowait(
+                        b'', OPCODE=WebsocketOPCODE.CLOSE_CONN)
+                    raise Exception(
+                        'Client %s:%s requested to close connection' % self.client_address)
+                self.callback_receive(frame)
+        if outputs:
+            # target socket is ready to receive,sending frame from the top of the list
+            if self.queue:
+                self.caller.wfile.write(self.queue.pop(0))
+
     def run(self):
         '''
             Starts processing I/O,and blocks until connection is closed or flag is set
         '''
         while self.keep_alive:
             try:
-                # Using select() to process selectable IOs
-                inputs = (sel:=select.select([self.caller.request], [self.caller.request], [], 1.0))[0]
-                outputs = sel[1]
-                time.sleep(0.01)
-                # Adding 10ms of sleep after select() to reduce the heavy CPU usage
-                # Pretty hacky,but will do the job
-                # Using select() to proccess bidirectional IO
-                if inputs:
-                    # socket is reciveable,process frame,then callback
-                    if (frame:= self.receive()):
-                        if frame[4] == WebsocketOPCODE.CLOSE_CONN:
-                            # client requested to close connection
-                            self.send_nowait(
-                                b'', OPCODE=WebsocketOPCODE.CLOSE_CONN)
-                            raise Exception(
-                                'Client %s:%s requested to close connection' % self.client_address)
-                        self.callback_receive(frame)
-                if outputs:
-                    # socket is sendable,sending frame from the top of the list
-                    if self.messages:
-                        self.caller.wfile.write(self.messages.pop(0))
+                self.handle_once()
             except Exception as e:
                 # Quit once any exception occured
                 self.caller.log_message(str(e))
@@ -181,7 +179,7 @@ class WebsocketSession():
 
     def send_nowait(self, PAYLOAD, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
         '''
-            Sends a constructed message to the queue,OPCODE included
+            Sends a constructed message without putting it inside the queue
         '''
         self.caller.wfile.write(
             self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
@@ -191,7 +189,7 @@ class WebsocketSession():
         '''
             Adds a constructed message to the queue,OPCODE included
         '''
-        self.messages.append(self.__websocket_constructframe(
+        self.queue.append(self.__websocket_constructframe(
             PAYLOAD, FIN, OPCODE, MASK))
 
     def receive(self):
@@ -213,7 +211,7 @@ class WebsocketSession():
         '''
             Wait until messages are all sent
         '''
-        while self.messages:
+        while self.queue:
             pass
 
     def __websocket_handshake(self):
@@ -451,9 +449,10 @@ if __name__ == "__main__":
         caller.end_headers()
         caller.wfile.write(f'''
             <h1>Welcome to PyWebServer!</h1>
-            <p href="ws://{server.server_address[0]}:{server.server_address[1]}">
-                Websocket test:ws://{server.server_address[0]}:{server.server_address[1]}
-            </p>
+            <h3>For Websocket ECHO Server:</h3>
+            <a href="ws://{server.server_address[0]}:{server.server_address[1]}">
+            ws://{server.server_address[0]}:{server.server_address[1]}
+            </a>
         '''.encode())
         caller.wfile.flush()
 
@@ -467,10 +466,11 @@ if __name__ == "__main__":
             session.send(b'OK.' + frame[-1])
         session.callback_receive = callback_receive
         session.run()
-    server = WebServer(('', 3331))
+    server = WebServer(('localhost', 3331))
     server.do_GET = GET
     server.do_WS = WS
-    logging.info('''Echo-server serving:
-    ws://{0}:{1}
-    http://{0}:{1}'''.format(*server.server_address))
+    logging.info('''
+    Echo-server serving:
+        ws://{0}:{1}
+        http://{0}:{1}'''.format(*server.server_address))
     server.serve_forever()
