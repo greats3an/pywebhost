@@ -134,13 +134,13 @@ class WebsocketSession():
         # Do handshake
         self.__websocket_handshake()
         self.caller.log_message(
-            'New Websocket session from %s:%s' % self.caller.client_address)
+            'New Websocket session from %s:%s' % self.caller.client_address)   
         super().__init__()
 
     def handle_once(self):
         '''Handles IO event for once'''
         # Using select() to process selectable IOs
-        inputs = (sel:=select.select([self.caller.request], [self.caller.request], [], 1.0))[0]
+        inputs = (sel:=([self.caller.request], [self.caller.request], [], 1.0))[0]
         outputs = sel[1]
         if inputs:
             # target socket is ready to send,process frame,then callback
@@ -164,6 +164,7 @@ class WebsocketSession():
         while self.keep_alive:
             try:
                 self.handle_once()
+                time.sleep(0.01)
             except Exception as e:
                 # Quit once any exception occured
                 self.caller.log_message(str(e))
