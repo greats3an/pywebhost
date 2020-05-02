@@ -34,13 +34,8 @@ def WS(caller: HTTPRequestHandler):
         session.send(b'OK.' + frame[-1])
     session.callback_receive = callback_receive
     session.run()
-# Error test
-@server.path('GET','/error',http.HTTP)
-def ERROR(caller : HTTPRequestHandler):
-# Directroy access
-    caller.send_response(503)
-    caller.end_headers()
-server.directory('/','.')
+# Test folder
+server.directory('/','test')
 
 logging.info('Now serving... %s:%s' % server.server_address)
 server.serve_forever()

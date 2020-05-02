@@ -67,10 +67,9 @@ class HTTP(Protocol):
         if os.path.exists(relative_path):
             # File exists,starts sending
             self.caller.log_message('Mapping HTTP URL request %s -> %s' % (self.caller.path,relative_path))
-            self.caller.send_response(200)
-            self.caller.end_headers()
-            self.caller.proto.write_file(relative_path)
-            return 200
+            result = self.caller.proto.write_file(relative_path)
+            # Do not let server handle HTTP codes
+            return
         else:
             # Not on the local machine,404 it is
             self.caller.log_error('Failed Mapping HTTP URL request %s -> %s' % (self.caller.path,relative_path))
@@ -78,27 +77,56 @@ class HTTP(Protocol):
         return super().__relative__()
 
     def write_string(self,string,encoding='utf-8'):
-        '''Sends a string to the client'''
+        '''Sends a string to the client,DOES NOT flush headers nor send response code'''
         return self.caller.wfile.write(string.encode(encoding) if type(string) != bytes else string)
 
     def write_file(self,path,chunck=256 * 1024,support_206=True):
-        '''Sends a file with path'''
-        def send_once():
-            f = open(path,'rb')
+        '''Sends a file with path,will flush the headers,and sends a valid HTTP response code'''
+        f,s = open(path,'rb'),os.stat(path).st_size
+        # Always add this header first
+        # For sending all of the file in chunks
+        def send_once():                        
+            self.caller.send_response(200)
+            self.caller.send_header('Content-Length',str(s))
+            self.caller.end_headers()            
             chunk = f.read(chunck)
             while chunk:
                 try:
                     self.caller.wfile.write(chunk)
                     chunk = f.read(chunck)
                 except Exception:
-                    return False
+                    # Connection closed while transmitting,or something else
+                    return True
             f.close()
             return True
+        # For HTTP 206 : Range headers
         def send_range():
             # Checks range header (if it exists and is satisfiable)
             if not self.caller.headers.get('Range'):return False
-            # TODO:Actually perfrom the partial sending thing...
-            return False
+            # If not exist,let `send_once` handle it. Parse range header if exsists
+            Range = self.caller.headers.get('Range')
+            if not Range[:6] == 'bytes=' : return False
+            # Does not start with `bytes`,let `send_once` do it afterwards
+            Range = Range[6:]
+            start,end = Range.split('-')
+            start,end = int(start if start else 0),int(end if end else s)
+            if not (start >= 0 and start < s and end > 0 and end > start and end <= s):
+                # Range not satisfiable
+                self.caller.send_response(416)
+                self.caller.end_headers()
+                # Stop the routine right here
+                return True
+            # Otherwise,good to go!
+            self.caller.send_response(206)
+            self.caller.send_header('Accept-Ranges','bytes')
+            self.caller.send_header('Content-Range','bytes %s-%s/%s' % (start,end,s))
+            self.caller.end_headers()            
+            try:
+                f.seek(start)
+                self.caller.wfile.write(f.read(end - start))
+            except Exception:
+                return True
+            return True
         if support_206:
             if send_range():return True
         return send_once()
