@@ -21,7 +21,7 @@ class Websocket(Protocol):
     '''
         # Websocket object
 
-        - caller          :       RequestHandler object
+        - handler          :       RequestHandler object
         - run             :       starts receiving.must be executed during the request
             - Performing `run` will block the current request thread until either the server / client decides to close the connection
         - send            :       put message into queue,then it will be sent later if possible
@@ -34,9 +34,9 @@ class Websocket(Protocol):
     '''
 
     @staticmethod
-    def __confidence__(caller) -> float:
+    def __confidence__(handler) -> float:
         '''Websocket confidence,ranges from 0~1'''
-        return super(Websocket,Websocket).__confidence__(caller,{
+        return super(Websocket,Websocket).__confidence__(handler,{
             Confidence.headers:{
                 'Sec-WebSocket-Key':lambda k:0.8 if len(k) > 8 else 0.1,
                 # If one request has this header,and the length of it is more than 8,it must
@@ -46,22 +46,22 @@ class Websocket(Protocol):
             }
         })
 
-    def __init__(self,caller):  
+    def __init__(self,handler):  
         '''Creates the websocket object'''  
-        self.caller = caller
+        self.handler = handler
         self.keep_alive = True
         self.queue = []
         super().__init__()
 
     def handshake(self):
         # Do Websocket handshake
-        self.caller.send_response(101)
-        self.caller.send_header('Connection', 'Upgrade')
-        self.caller.send_header('Sec-WebSocket-Accept',self.__ws_gen_responsekey(self.caller.headers.get('Sec-WebSocket-Key')))
-        self.caller.send_header('Upgrade', 'websocket')
-        self.caller.end_headers()
-        self.caller.wfile.flush()
-        self.caller.log_message('New Websocket session from %s:%s' % self.caller.client_address)   
+        self.handler.send_response(101)
+        self.handler.send_header('Connection', 'Upgrade')
+        self.handler.send_header('Sec-WebSocket-Accept',self.__ws_gen_responsekey(self.handler.headers.get('Sec-WebSocket-Key')))
+        self.handler.send_header('Upgrade', 'websocket')
+        self.handler.end_headers()
+        self.handler.wfile.flush()
+        self.handler.log_message('New Websocket session from %s:%s' % self.handler.client_address)   
 
     def callback_receive(self, frame) -> tuple:
         '''
@@ -79,7 +79,7 @@ class Websocket(Protocol):
     def handle_once(self):
         '''Handles IO event for once'''
         # Using select() to process selectable IOs
-        inputs = (sel:=([self.caller.request], [self.caller.request], [], 1.0))[0]
+        inputs = (sel:=([self.handler.request], [self.handler.request], [], 1.0))[0]
         outputs = sel[1]
         if inputs:
             # target socket is ready to send,process frame,then callback
@@ -89,12 +89,12 @@ class Websocket(Protocol):
                     self.send_nowait(
                         b'', OPCODE=WebsocketOPCODE.CLOSE_CONN)
                     raise Exception(
-                        'Client %s:%s requested to close connection' % self.caller.client_address)
+                        'Client %s:%s requested to close connection' % self.handler.client_address)
                 self.callback_receive(frame)
         if outputs:
             # target socket is ready to receive,sending frame from the top of the list
             if self.queue:
-                self.caller.wfile.write(self.queue.pop(0))
+                self.handler.wfile.write(self.queue.pop(0))
 
     def run(self):
         '''
@@ -106,18 +106,18 @@ class Websocket(Protocol):
                 time.sleep(0.01)
             except Exception as e:
                 # Quit once any exception occured
-                self.caller.log_message(str(e))
+                self.handler.log_message(str(e))
                 self.keep_alive = False
-        self.caller.log_request(
-            'Websocket Connection closed:%s:%s' % self.caller.client_address)
+        self.handler.log_request(
+            'Websocket Connection closed:%s:%s' % self.handler.client_address)
 
     def send_nowait(self, PAYLOAD, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
         '''
             Sends a constructed message without putting it inside the queue
         '''
-        self.caller.wfile.write(
+        self.handler.wfile.write(
             self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
-        self.caller.wfile.flush()
+        self.handler.wfile.flush()
 
     def send(self, PAYLOAD, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
         '''
@@ -131,7 +131,7 @@ class Websocket(Protocol):
             Receives a single frame
         '''
         try:
-            return self.__websocket_recieveframe(self.caller.rfile)
+            return self.__websocket_recieveframe(self.handler.rfile)
         except Exception:
             return None
 
@@ -225,7 +225,7 @@ class Websocket(Protocol):
             +---------------------------------------------------------------+
         '''
         if not rfile:
-            rfile = self.caller.rfile
+            rfile = self.handler.rfile
         b1, b2 = rfile.read(2)
         FIN, RSV1, RSV2, RSV3 = self.__extract_byte(b1)[:4]
         OPCODE = self.__construct_byte(self.__extract_byte(b1)[4:])

@@ -58,6 +58,43 @@ class Confidence:
         confidence = weights[handler.command] if handler.command in weights.keys() else 0
         return confidence
 
+class RelativeModules():
+    '''
+        RelativeModules base class
+
+        A `RelativeModule` Method must take two postional arguments and must be static: 
+            
+        `proto` (A `Protocol` Object) and `path` (The requested resoure)
+
+    '''
+    @staticmethod
+    def dummy_module(proto,rel_path:str,*a,**k):
+        '''
+        Dummy module,just for show
+        '''
+        pass
+
+class RelativeMapping():
+    def __init__(self,path,modules:dict,**kw):
+        '''
+            path    :   URL base path
+
+            modules :   A `dict`,has `str` for keys and `RelativeModule` methods for values
+
+            -   For example,to do diffrent things for `file` and `folder` of HTTP module:
+
+                    RelativeMapping(path='/',local='html',modules={
+                        'file':http.Modules.write_file,
+                        'folder':http.Modlues.index_folder
+                    })                
+        '''
+        self.path = path # URL base
+        self.modules = modules # How to deal with different types of files
+        for k,v in kw.items():
+            # Also writes new things here
+            setattr(self,k,v)
+        super().__init__()
+
 class Protocol():
     @staticmethod
     def __confidence__(handler,weights):
@@ -66,14 +103,14 @@ class Protocol():
 
             `handler`   :   A `HTTPRequestHandler` Object
 
-            `weights`   :   `Confidence` method for determinating confidence
+            `weights`   :   `Dict` with `Confidence` method as keys,see `Confidence` module for help
         '''
         confidence = 0.00
         for m_confidence in weights.keys():
             confidence += m_confidence(handler,weights[m_confidence])
         return confidence
 
-    def __relative__(self,mapping):
+    def __relative__(self,mapping : RelativeMapping):
         '''Handles the relative path'''
         return 0
 import os
