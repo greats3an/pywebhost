@@ -1,7 +1,7 @@
 from pywebserver.handler import HTTPRequestHandler
 from pywebserver.proto import http,websocket
 from pywebserver import PyWebServer
-import logging,coloredlogs
+import logging,coloredlogs,base64
 
 coloredlogs.install(logging.DEBUG)
 server = PyWebServer(
@@ -16,15 +16,13 @@ def GET(handler: HTTPRequestHandler):
     handler.send_header('Content-Type', 'text/html;encoding=utf-8')
     handler.end_headers()
     http.Modules.write_string(handler.proto,f'''
+        <link rel="icon" type="image/png" href="favicon.ico">
+        <title>PyWebServer Landing Page</title>
         <h1>Welcome to PyWebServer!</h1>
         <h3>For Websocket ECHO Server:</h3>
-        <a href="ws://{server.server_address[0]}:{server.server_address[1]}">
-        ws://{server.server_address[0]}:{server.server_address[1]}
-        </a>
+        <a href="ws://{server.server_address[0]}:{server.server_address[1]}">ws://{server.server_address[0]}:{server.server_address[1]}</a>
         <h3>For File Explorer:</h3>
-        <a href="files">
-        http://{server.server_address[0]}:{server.server_address[1]}/files
-        </a>
+        <a href="files">http://{server.server_address[0]}:{server.server_address[1]}/files</a>
     '''.encode())
     handler.wfile.flush()
 # Websocket Echo Server
@@ -38,6 +36,14 @@ def WS(handler: HTTPRequestHandler):
         session.send(b'OK.' + frame[-1])
     session.callback_receive = callback_receive
     session.run()
+@server.path_absolute('GET','/favicon.ico',http.HTTP)
+def favicon(handler: HTTPRequestHandler):
+    favicon_base64 = '''iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAABXSURBVDhPpc1LDsBACALQuf+lrQ2EMpr059tMhNCu+OgcrB2Lhjk6HOkqLHR/B45FwxyPqChmgzwci4Y5nvfGf1BRzAZ5OBSFcg5w3KgDh6JQ/vztTcQBqP4l98/X4gAAAAAASUVORK5CYII=
+    '''
+    handler.send_response(200)
+    handler.send_header('Content-Type','image/x-icon')
+    handler.end_headers()
+    http.Modules.write_string(handler.proto,base64.b64decode(favicon_base64))
 # Test folder
 server.add_relative(
     'GET','/files',http.HTTP,

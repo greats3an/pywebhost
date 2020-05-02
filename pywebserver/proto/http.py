@@ -67,7 +67,7 @@ class Modules(RelativeModules):
         proto.handler.send_response(200)
         proto.handler.send_header('Content-Type','text/html; charset=utf-8')
         proto.handler.end_headers()
-        html = f'''<head><title>Index of {path}</title></head>\n'''
+        html = f'''<head><meta charset="UTF-8"><title>Index of {path}</title></head>\n'''
         html+= f'''<body><h1>Index of {path}</h1><hr><pre><a href="..">..</a>\n'''
         for item in os.listdir(path):
             html += f'<a href="{proto.handler.path}/{item}"/>{item}</a>\n'
