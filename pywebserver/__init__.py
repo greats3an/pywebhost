@@ -84,7 +84,7 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         if not path in self.relative[command].keys():self.relative[command][path] = {}
         self.relative[command][path][protocol] = RelativeMapping(path,modules,**kw)
 
-    def path_absolute(self,command,path,protocol,settings={}):
+    def path_absolute(self,command,path,protocol):
         '''
         Decorator for ABSOLUTE path and its command
         
