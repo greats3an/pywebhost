@@ -3,7 +3,7 @@ import socketserver
 from proto import Protocol,http
 from handler import HTTPRequestHandler
 import os
-
+import urllib.parse
 class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     '''
         Base server class
@@ -38,7 +38,8 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
 
         def check_for_relative():
             return caller.proto.__relative__(self.relative)
-
+        caller.path = urllib.parse.unquote(caller.path)
+        # Decode it first,then some
         code = check_for_absolute()
 
         if code in range(300,600):

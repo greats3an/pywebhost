@@ -35,7 +35,7 @@ def WS(caller: HTTPRequestHandler):
     session.callback_receive = callback_receive
     session.run()
 # Test folder
-server.directory('/','test')
+server.directory('/',r'D:\files')
 
 logging.info('Now serving... %s:%s' % server.server_address)
 server.serve_forever()
