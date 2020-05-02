@@ -32,7 +32,7 @@ class HTTP(Protocol):
     def __init__(self,handler):
         '''Initializes the instance'''
         self.handler = handler
-        super().__init__()
+        super().__init__(handler)
     
     def __relative__(self,mapping : RelativeMapping):
         '''

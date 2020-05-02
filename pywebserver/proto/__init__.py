@@ -112,11 +112,11 @@ class Protocol():
 
     def __relative__(self,mapping : RelativeMapping):
         '''Handles the relative path'''
-        return 0
+        return
 
     def __init__(self,handler):
-        '''Initiaztes the protocol'''
-        super().__init__()
+        '''Initiaztes the protocol with HTTPHandler'''
+        return
 import os
 __all__ = [i[:-3] for i in os.listdir(os.path.dirname(__file__)) if i[-2:] == 'py' and i != '__init__.py']
 from . import *

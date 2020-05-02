@@ -4,3 +4,6 @@ __pycahce__
 \!*
 html
 test
+*.exe
+*.dll
+*.build
