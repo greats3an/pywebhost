@@ -4,7 +4,10 @@ from pywebserver import PyWebServer
 import logging,coloredlogs
 
 coloredlogs.install(logging.DEBUG)
-server = PyWebServer(('localhost',3331),[http.HTTP,websocket.Websocket])
+server = PyWebServer(
+    ('localhost',3331),
+    [http.HTTP,websocket.Websocket],
+)
 
 # Welcome page
 @server.path('GET','/',http.HTTP)
@@ -12,7 +15,7 @@ def GET(caller: HTTPRequestHandler):
     caller.send_response(200)
     caller.send_header('Content-Type', 'text/html;encoding=utf-8')
     caller.end_headers()
-    caller.wfile.write(f'''
+    caller.proto.write_string(f'''
         <h1>Welcome to PyWebServer!</h1>
         <h3>For Websocket ECHO Server:</h3>
         <a href="ws://{server.server_address[0]}:{server.server_address[1]}">
@@ -31,8 +34,13 @@ def WS(caller: HTTPRequestHandler):
         session.send(b'OK.' + frame[-1])
     session.callback_receive = callback_receive
     session.run()
+# Error test
+@server.path('GET','/error',http.HTTP)
+def ERROR(caller : HTTPRequestHandler):
 # Directroy access
-server.directory('/','./')
+    caller.send_response(503)
+    caller.end_headers()
+server.directory('/','.')
 
 logging.info('Now serving... %s:%s' % server.server_address)
 server.serve_forever()

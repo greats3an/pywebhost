@@ -7,6 +7,17 @@ import os
 class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     '''
         Base server class
+
+        The `__handle__` method handles all HTTP based requests,
+
+        Notes:
+        -   Server will check absolute mapping first,then the Direcotry file mapping
+
+        __init__():
+
+                server_address  :   A tuple-like address,for example : `('localhost',1234)`
+                proto           :   A iterable of `Protocol`,for example : `[http.HTTP]`
+                config          :   Other misc config
     '''
 
     def __handle__(self, caller : HTTPRequestHandler):
@@ -26,41 +37,15 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
             return func(caller)
 
         def check_for_relative():
-            if not type(caller.proto) == http.HTTP:return 500
-            # Not http,ignored
-            # Now,check the mapping
-            targeturl,pathdelta='',65535
-            for url in self.relative.keys():
-                # Does the path begin with the set mapping?
-                if caller.path[:len(url)] == url:
-                    # it beigns with such string
-                    delta = len(caller.path) - len(url)
-                    # How much does it deviate from the requested URL?
-                    if delta <= pathdelta:
-                        # Delta is smaller,choose this instead
-                        pathdelta = delta
-                        targeturl = url
-            if not targeturl:return 404
-            relative_path = self.relative[targeturl] + '/' + caller.path[len(url):]
-            caller.log_message('Mapping URL request %s -> %s' % (caller.path,relative_path))
-            if os.path.exists(relative_path):
-                # File exists,starts sending
-                caller.send_response(200)
-                caller.end_headers()
-                caller.proto.write_file(relative_path)
-                return 200
-            else:
-                # Not on the local machine,404 it is
-                return 404
-
+            return caller.proto.__relative__(self.relative)
 
         code = check_for_absolute()
 
-        if code in range(400,500):
+        if code in range(300,600):
             # Abnormal codes,check for relative now
             code = check_for_relative()
         
-        if code in range(400,500):
+        if code in range(300,600):
             # Still not normal.Sends the error code
             caller.send_response(code)
             caller.end_headers()
@@ -74,17 +59,22 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
             server.directory('/','html')
         '''
         self.relative[urlpath] = physical
+
     def path(self,command,path,protocol):
         '''
         Decorator for path and its command
         
         For example:
             
-            @server.path('GET','/',http)
+            @server.path('GET','/',http.HTTP)
             def root(caller):
                 caller.send_response(200)
                 caller.end_hedaers()
                 caller.wfile.write('Hello World!')
+
+        The method **SHOULD** return a HTTP error code afterwards
+
+        if it didn't send by itself,otherwise you *SHOULD NOT DO IT*
         '''
         def wrapper(func):
             if not command in self.absolute.keys():self.absolute[command] = {}
@@ -93,8 +83,11 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
             return func
         return wrapper
 
-    def __init__(self, server_address,protos):
-        # The request mapping
+    def __init__(self, server_address : tuple,protos : list,**config):
         self.absolute,self.relative = {},{}
         # Absolute path and relative path to the root of the program
-        super().__init__(server_address, lambda *args: HTTPRequestHandler(*args, creator=self, protos=protos))
+        def GetHTTPRequestHandler(*args):
+            handler =  HTTPRequestHandler(*args,creator=self, protos=protos,**{'server_version':'PyWebServer'},**config)
+            # Always override the `server_version` field
+            return handler
+        super().__init__(server_address, GetHTTPRequestHandler)

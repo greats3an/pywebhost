@@ -5,11 +5,12 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
     Base HTTP request handler Class
     '''
 
-    def __init__(self, request, client_address, server,creator,protos=[]):
+    def __init__(self, request, client_address, server,creator,protos=[],**config):
 
         self.logger = logging.getLogger('RequestHandler')
         self.creator = creator
         self.protos = protos
+        for key,value in config.items():setattr(self,key,value)
         super().__init__(request, client_address, server)
 
     def handle_one_request(self):
@@ -47,6 +48,19 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
             self.close_connection = True
             return
 
+    def send_response(self, code, message=None):
+        """Add the response header to the headers buffer and log the
+        response code.
+
+        Also send two standard headers with the server software
+        version and the current date.
+
+        """
+        self.log_request(code)
+        self.send_response_only(code, message)
+        self.send_header('Server', '%s %s' % (self.server_version,self.sys_version))
+        self.send_header('Date', self.date_time_string())
+
     def log_message(self, format, *args):
         """Log an arbitrary message.
 
@@ -65,3 +79,17 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
         Modified to use `logging` module instead of `stderr`
         """
         self.logger.debug("%s %s" % (self.address_string(), format % args))
+
+    def log_error(self, format, *args):
+        """Log an error.
+
+        This is called when a request cannot be fulfilled.  By
+        default it passes the message on to log_message().
+
+        Arguments are the same as for log_message().
+
+        XXX This should go to the separate error log.
+
+        """
+
+        self.logger.error("%s %s" % (self.address_string(), format % args))
