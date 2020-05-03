@@ -19,19 +19,12 @@ class HTTP(Protocol):
     @staticmethod
     def __confidence__(handler) -> float:
         '''Websocket confidence,ranges from 0~1'''
-        return super(HTTP,HTTP).__confidence__(handler,{
-            Confidence.headers:{
-                'Sec-WebSocket-Key':lambda k:-0.8 if len(k) > 8 else 0,
-                # If one has this header,the confidence will be DECREASED because,well,it might be a
-                # Websocket request then
-            },
+        return super(HTTP,HTTP).__confidence__(handler,{            
             Confidence.const:0.5
-            # Always have a confidence of 0.5 for HTTP no matter what
         })
 
     def __init__(self,handler):
         '''Initializes the instance'''
-        self.handler = handler
         super().__init__(handler)
     
     def __relative__(self,mapping : RelativeMapping):

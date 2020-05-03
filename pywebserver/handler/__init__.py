@@ -1,5 +1,6 @@
 import logging,socket
 from http import HTTPStatus, server
+from urllib.parse import urlparse,parse_qs
 class HTTPRequestHandler(server.BaseHTTPRequestHandler):
     '''
     Base HTTP request handler Class
@@ -10,12 +11,13 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
         self.logger = logging.getLogger('RequestHandler')
         self.creator = creator
         self.protos = protos
+        self.scheme, self.netloc, self.path, self.params, self.query, self.fragment = ('' for _ in range(0,6))
         for key,value in config.items():setattr(self,key,value)
         super().__init__(request, client_address, server)
 
     def handle_one_request(self):
         """
-            Forked from orignal,added websocket method detection
+            Handles the request
         """
         try:
             self.raw_requestline = self.rfile.readline(65537)
@@ -31,12 +33,16 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
             if not self.parse_request():
                 # An error code has been sent, just exit
                 return
+            self.scheme, self.netloc, self.path, self.params, self.query, self.fragment = urlparse(self.path)
+            self.query = parse_qs(self.query) # Decodes query string to a `dict`
+            # Decode the URL
             best_confidence = 0
             for proto in self.protos:
                 confidence = proto.__confidence__(self)
                 if confidence >= best_confidence:
                     best_confidence = confidence
                     self.proto=proto
+            # Find best-matching protocol
             self.proto=self.proto(self)
             # Initialize the protocol
             self.creator.__handle__(self)
@@ -60,6 +66,16 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
         self.send_response_only(code, message)
         self.send_header('Server', '%s %s' % (self.server_version,self.sys_version))
         self.send_header('Date', self.date_time_string())
+
+    def log_request(self, code='-', size='-'):
+        """Log an accepted request.
+
+        This is called by send_response().
+
+        """
+        if isinstance(code, HTTPStatus):
+            code = code.value
+        self.log_message('"%s" %s %s %s',self.requestline,self.path,str(code), str(size))
 
     def log_message(self, format, *args):
         """Log an arbitrary message.

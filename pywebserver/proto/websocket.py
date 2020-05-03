@@ -38,20 +38,15 @@ class Websocket(Protocol):
         '''Websocket confidence,ranges from 0~1'''
         return super(Websocket,Websocket).__confidence__(handler,{
             Confidence.headers:{
-                'Sec-WebSocket-Key':lambda k:0.8 if len(k) > 8 else 0.1,
-                # If one request has this header,and the length of it is more than 8,it must
-                # Be a websocket request...for the most part
-                'Sec-WebSocket-Version':lambda v:0.1,
-                'Sec-WebSocket-Extensions':lambda e:0.1
+                'Sec-WebSocket-Key':lambda v:1 if v and len(v) > 8 else 0
             }
         })
 
     def __init__(self,handler):  
         '''Creates the websocket object'''  
-        self.handler = handler
         self.keep_alive = True
         self.queue = []
-        super().__init__()
+        super().__init__(handler)
 
     def handshake(self):
         # Do Websocket handshake

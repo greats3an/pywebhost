@@ -26,7 +26,7 @@ def GET(handler: HTTPRequestHandler):
     '''.encode())
     handler.wfile.flush()
 # Websocket Echo Server
-@server.path_absolute('GET','/ws',websocket.Websocket)
+@server.path_absolute('GET','/',websocket.Websocket)
 def WS(handler: HTTPRequestHandler):
     # Accepts the reqeust
     session = handler.proto

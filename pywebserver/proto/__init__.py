@@ -26,9 +26,7 @@ class Confidence:
 
                 weights = {
                     Confidence.headers : {
-                        'Sec-WebSocket-Key':lambda k:0.8 if len(k) > 8 else 0.1,
-                        'Sec-WebSocket-Version':lambda v:0.1,
-                        'Sec-WebSocket-Extensions':lambda e:0.1
+                        'Sec-WebSocket-Key':1
                     }
                 }            
         '''
@@ -43,7 +41,7 @@ class Confidence:
         '''
             Confidence that are `command` weighted,passes command (GET,POST,OPTION,etc)
         
-            value to the lambda check
+            to a integer
 
             -   For example (Webdav confidence):
 
@@ -54,8 +52,28 @@ class Confidence:
                         'DEL'  : 1
                     } 
                 }
+                - Note that the command should always be CAPITAL
         '''
         confidence = weights[handler.command] if handler.command in weights.keys() else 0
+        return confidence
+
+    @staticmethod
+    def scheme(handler,weights : dict):
+        '''
+            Confidence that are `scheme` weighted,passes scheme
+        
+            to a integer
+
+            -   For example (Websocket confidence):
+
+                weights = {
+                    Confidence.scheme : {
+                        'ws' : 1
+                    } 
+                }
+                - Note that the scheme should always be non-capital
+        '''
+        confidence = weights[handler.scheme] if handler.scheme in weights.keys() else 0
         return confidence
 
 class RelativeModules():
@@ -116,6 +134,7 @@ class Protocol():
 
     def __init__(self,handler):
         '''Initiaztes the protocol with HTTPHandler'''
+        self.handler = handler
         return
 import os
 __all__ = [i[:-3] for i in os.listdir(os.path.dirname(__file__)) if i[-2:] == 'py' and i != '__init__.py']

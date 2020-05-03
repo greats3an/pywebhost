@@ -59,8 +59,6 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
             # Let the proto do the mapping
             return handler.proto.__relative__(mapping)
 
-        handler.path = urllib.parse.unquote(handler.path)
-        # Decode it first,then some
         code = check_for_absolute()
 
         if code in range(300,600):
