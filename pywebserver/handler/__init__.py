@@ -1,6 +1,6 @@
 import logging,socket
 from http import HTTPStatus, server
-from urllib.parse import urlparse,parse_qs
+from urllib.parse import urlparse,parse_qs,unquote
 class HTTPRequestHandler(server.BaseHTTPRequestHandler):
     '''
     Base HTTP request handler Class based on `BaseHTTPRequestHandler`
@@ -34,6 +34,7 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
                 # An error code has been sent, just exit
                 return
             self.scheme, self.netloc, self.path, self.params, self.query, self.fragment = urlparse(self.path)
+            self.path = unquote(self.path)
             self.query = parse_qs(self.query) # Decodes query string to a `dict`
             # Decode the URL
             best_confidence = 0
