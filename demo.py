@@ -1,12 +1,16 @@
 from pywebserver.handler import HTTPRequestHandler
 from pywebserver.proto import http,websocket
 from pywebserver import PyWebServer
-import logging,coloredlogs,base64
+import logging,coloredlogs,base64,sys
 
+if len(sys.argv) < 2:
+    print('usage:	demo.py [address] [port]')
+    print('Program will now use default address and port')
+    sys.argv = (sys.argv[0],'localhost',3331)
 coloredlogs.install(logging.DEBUG)
 server = PyWebServer(
-    ('localhost',3331),
-    [http.HTTP,websocket.Websocket],
+    (sys.argv[1],int(sys.argv[2])),
+    protos=[http.HTTP,websocket.Websocket]
 )
 
 # Websocket Echo Server

@@ -30,6 +30,8 @@ class Websocket(Protocol):
             - Called once the packet is received
         - kill            :       kills the current session
             - This will set the `keep_alive` flag `False`
+        - shutdown
+            - This will perfrom `kill`,and wait for the session to actually end
         - handshake       :       Performs the handshake,**MUST** be done before any further operation
     '''
 
@@ -44,7 +46,7 @@ class Websocket(Protocol):
 
     def __init__(self,handler):  
         '''Creates the websocket object'''  
-        self.keep_alive = True
+        self.keep_alive,self.is_shutdown = True,False
         self.queue = []
         super().__init__(handler)
 
@@ -81,45 +83,44 @@ class Websocket(Protocol):
             if (frame:= self.receive()):
                 if frame[4] == WebsocketOPCODE.CLOSE_CONN:
                     # client requested to close connection
-                    self.send_nowait(
-                        b'', OPCODE=WebsocketOPCODE.CLOSE_CONN)
-                    raise Exception(
-                        'Client %s:%s requested to close connection' % self.handler.client_address)
+                    self.send_nowait(b'', OPCODE=WebsocketOPCODE.CLOSE_CONN)
+                    # accepts such request
+                    raise Exception('Client %s:%s requested to close connection' % self.handler.client_address)
                 self.callback_receive(frame)
         if outputs:
             # target socket is ready to receive,sending frame from the top of the list
             if self.queue:
+                # is there anything in queue?
                 self.handler.wfile.write(self.queue.pop(0))
 
-    def run(self):
+    def serve_forever(self,pool_interval=0.01):
         '''
             Starts processing I/O,and blocks until connection is closed or flag is set
         '''
         while self.keep_alive:
             try:
                 self.handle_once()
-                time.sleep(0.01)
+                time.sleep(pool_interval)
+                # How frequent will we poll?
             except Exception as e:
                 # Quit once any exception occured
-                self.handler.log_message(str(e))
+                self.handler.log_error(str(e))
                 self.keep_alive = False
-        self.handler.log_request(
-            'Websocket Connection closed:%s:%s' % self.handler.client_address)
+        self.handler.log_request('Websocket Connection closed:%s:%s' % self.handler.client_address)
+        self.is_shutdown = True
 
     def send_nowait(self, PAYLOAD, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
         '''
             Sends a constructed message without putting it inside the queue
         '''
-        self.handler.wfile.write(
-            self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
+        self.handler.wfile.write(self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
         self.handler.wfile.flush()
 
     def send(self, PAYLOAD, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
         '''
-            Adds a constructed message to the queue,OPCODE included
+            Adds a constructed message to the queue
         '''
-        self.queue.append(self.__websocket_constructframe(
-            PAYLOAD, FIN, OPCODE, MASK))
+        self.queue.append(self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
 
     def receive(self):
         '''
@@ -129,22 +130,13 @@ class Websocket(Protocol):
             return self.__websocket_recieveframe(self.handler.rfile)
         except Exception:
             return None
-
-    def kill(self):
-        '''
-            Set keep_alive flag False
-        '''
-        self.keep_alive = False
-
-    def wait(self):
-        '''
-            Wait until messages are all sent
-        '''
-        while self.queue:
-            pass
-
-
     
+    def shutdown(self):
+        '''Sets kill switch,and wait for the loop to end'''
+        self.send_nowait(b'', OPCODE=WebsocketOPCODE.CLOSE_CONN)
+        self.keep_alive = False
+        while not self.is_shutdown:pass
+
     def __websocket_constructframe(self, data: bytearray, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
         '''
         Constructing frame

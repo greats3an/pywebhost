@@ -3,7 +3,7 @@ from http import HTTPStatus, server
 from urllib.parse import urlparse,parse_qs
 class HTTPRequestHandler(server.BaseHTTPRequestHandler):
     '''
-    Base HTTP request handler Class
+    Base HTTP request handler Class based on `BaseHTTPRequestHandler`
     '''
 
     def __init__(self, request, client_address, server,creator,protos=[],**config):
@@ -16,9 +16,9 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
         super().__init__(request, client_address, server)
 
     def handle_one_request(self):
-        """
+        '''
             Handles the request
-        """
+        '''
         try:
             self.raw_requestline = self.rfile.readline(65537)
             if len(self.raw_requestline) > 65536:
@@ -54,61 +54,35 @@ class HTTPRequestHandler(server.BaseHTTPRequestHandler):
             self.close_connection = True
             return
 
-    def send_response(self, code, message=None):
-        """Add the response header to the headers buffer and log the
+    def send_response(self, code, message=None,server_headers=True):
+        '''Add the response header to the headers buffer and log the
         response code.
 
         Also send two standard headers with the server software
         version and the current date.
-
-        """
+        '''
         self.log_request(code)
         self.send_response_only(code, message)
+        if not server_headers:return
         self.send_header('Server', '%s %s' % (self.server_version,self.sys_version))
         self.send_header('Date', self.date_time_string())
 
     def log_request(self, code='-', size='-'):
-        """Log an accepted request.
+        '''Log an accepted request.
 
         This is called by send_response().
-
-        """
+        '''
         if isinstance(code, HTTPStatus):
             code = code.value
-        self.log_message('"%s" %s %s %s',self.requestline,self.path,str(code), str(size))
+        self.log_message('"%s" %s %s',self.requestline,str(code), str(size))
 
     def log_message(self, format, *args):
-        """Log an arbitrary message.
-
-        This is used by all other logging functions.  Override
-        it if you have specific logging wishes.
-
-        The first argument, FORMAT, is a format string for the
-        message to be logged.  If the format string contains
-        any % escapes requiring parameters, they should be
-        specified as subsequent arguments (it's just like
-        printf!).
-
-        The client ip and current date/time are prefixed to
-        every message.
-
-        Modified to use `logging` module instead of `stderr`
-        """
-        self.logger.debug("%s %s" % (self.address_string(), format % args))
+        '''Log an arbitrary message.'''
+        self.logger.debug("%s | %s | %s" % (self.address_string(),self.path, format % args))
 
     def log_error(self, format, *args):
-        """Log an error.
-
-        This is called when a request cannot be fulfilled.  By
-        default it passes the message on to log_message().
-
-        Arguments are the same as for log_message().
-
-        XXX This should go to the separate error log.
-
-        """
-
-        self.logger.error("%s %s" % (self.address_string(), format % args))
+        '''Log an error.'''
+        self.logger.error("%s | %s | %s" % (self.address_string(),self.path, format % args))
 import os
 __all__ = [i[:-3] for i in os.listdir(os.path.dirname(__file__)) if i[-2:] == 'py' and i != '__init__.py']
 from . import *
