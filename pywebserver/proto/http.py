@@ -42,26 +42,29 @@ class HTTP(Protocol):
         if os.path.exists(localpath) and os.path.isfile(localpath):
             # A File
             if 'file' in mapping.modules.keys():
-                mapping.modules['file'](self,localpath)
+                return mapping.modules['file'](self,localpath)
+            return 403
         elif os.path.exists(localpath) and not os.path.isfile(localpath):
             # A Folder
             if 'folder' in mapping.modules.keys():
-                mapping.modules['folder'](self,localpath)
+                return mapping.modules['folder'](self,localpath)                
+            return 403
         else:
             # Not on the local machine,404 it is
-            self.handler.log_error('Failed Mapping HTTP URL request %s -> %s' % (self.handler.path,localpath))
+            self.handler.log_message('Failed Mapping HTTP URL request %s -> %s' % (self.handler.path,localpath))
             return 404
         return 200
 
 class Modules(RelativeModules):
     @staticmethod
-    def index_folder(proto:HTTP,path,encoding='utf-8'):
+    def index_folder(proto:HTTP,path,encoding='utf-8',stylesheet=''):
         '''Automaticly indexes the folder to human readable HTML page'''
         proto.handler.send_response(200)
         proto.handler.send_header('Content-Type','text/html; charset=utf-8')
         proto.handler.end_headers()
-        html = f'''<head><meta charset="UTF-8"><title>Index of {path}</title></head>\n'''
-        html+= f'''<body><h1>Index of {path}</h1><hr><pre><a href="..">..</a>\n'''
+        html = f'''<head><meta charset="UTF-8"><title>Index of {path}</title>\n'''
+        html+= f'''<style>{stylesheet}</style>\n'''
+        html+= f'''</head><body><h1>Index of {path}</h1><hr><pre><a href="..">..</a>\n'''
         for item in os.listdir(path):
             html += f'<a href="{proto.handler.path}/{item}"/>{item}</a>\n'
         html+= f'''</pre><hr><body>\n'''
