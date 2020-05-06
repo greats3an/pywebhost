@@ -73,7 +73,7 @@ class Modules(RelativeModules):
         '''Sends a string to the client,DOES NOT flush headers nor send response code'''
         return proto.handler.wfile.write(string.encode(encoding) if type(string) != bytes else string)
     @staticmethod
-    def write_file(proto:HTTP,path,chunck=256 * 1024,support_range=True):
+    def write_file(proto:HTTP,path,chunck=4 * 8192,support_range=True):
         '''Sends a file with path,will flush the headers,and sends a valid HTTP response code'''
         f,s = open(path,'rb'),os.stat(path).st_size
         # Always add this header first
@@ -115,14 +115,16 @@ class Modules(RelativeModules):
             proto.handler.send_header('Content-Range','bytes %s-%s/%s' % (start,end,s))
             proto.handler.end_headers()            
             try:
-                read = 0
+                read = start
                 # How much have we already read?
                 f.seek(start)
                 # Seek from the start
-                for bs in range(0,end - start + chunck,chunck):
-                    if bs>0:proto.handler.wfile.write(f.read(bs - read))
+                for current in range(start,end,chunck):
+                    if (current - read) > 0:proto.handler.wfile.write(f.read(current - read))
                     # Read & send the delta amount of data
-                    read = bs
+                    read = current
+                proto.handler.wfile.write(f.read(end - current))
+                # Finally,send the rest
             except Exception:
                 return True
             return True
