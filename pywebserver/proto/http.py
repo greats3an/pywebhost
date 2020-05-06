@@ -38,7 +38,6 @@ class HTTP(Protocol):
             The `mapping` **MUST** contain `local` property
         '''
         localpath = mapping.local + '/' + self.handler.path[len(mapping.path):] 
-        self.handler.log_message('Mapping HTTP URL request %s -> %s' % (self.handler.path,localpath))
         if os.path.exists(localpath) and os.path.isfile(localpath):
             # A File
             if 'file' in mapping.modules.keys():
@@ -51,7 +50,6 @@ class HTTP(Protocol):
             return 403
         else:
             # Not on the local machine,404 it is
-            self.handler.log_message('Failed Mapping HTTP URL request %s -> %s' % (self.handler.path,localpath))
             return 404
         return 200
 
@@ -75,7 +73,7 @@ class Modules(RelativeModules):
         '''Sends a string to the client,DOES NOT flush headers nor send response code'''
         return proto.handler.wfile.write(string.encode(encoding) if type(string) != bytes else string)
     @staticmethod
-    def write_file(proto:HTTP,path,chunck=256 * 1024,support_206=True):
+    def write_file(proto:HTTP,path,chunck=256 * 1024,support_range=True):
         '''Sends a file with path,will flush the headers,and sends a valid HTTP response code'''
         f,s = open(path,'rb'),os.stat(path).st_size
         # Always add this header first
@@ -117,11 +115,17 @@ class Modules(RelativeModules):
             proto.handler.send_header('Content-Range','bytes %s-%s/%s' % (start,end,s))
             proto.handler.end_headers()            
             try:
+                read = 0
+                # How much have we already read?
                 f.seek(start)
-                proto.handler.wfile.write(f.read(end - start))
+                # Seek from the start
+                for bs in range(0,end - start + chunck,chunck):
+                    if bs>0:proto.handler.wfile.write(f.read(bs - read))
+                    # Read & send the delta amount of data
+                    read = bs
             except Exception:
                 return True
             return True
-        if support_206:
+        if support_range:
             if send_range():return True
         return send_once()
