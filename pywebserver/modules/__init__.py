@@ -18,7 +18,7 @@ class HTTPModules():
 
     @staticmethod
     def RestrictVerbs(request:RequestHandler,verbs=['GET','POST']):
-        '''Restricts HTTP Verbs,does nothing if the restriction passes'''
+        '''Restricts HTTP Verbs,does nothing if the verb is in the `verbs` list'''
         if not request.command in verbs:
             request.send_error(HTTPStatus.FORBIDDEN)
             request.end_headers()

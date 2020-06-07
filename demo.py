@@ -54,6 +54,7 @@ pre {
 
 @server.route(PathMakerModules.Absolute('/'))
 def index(request : RequestHandler):
+    HTTPModules.RestrictVerbs(request,['POST'])
     HTTPModules.Redirect(request,'files')
 
 @server.route(PathMakerModules.DirectoryPath('/files/'))

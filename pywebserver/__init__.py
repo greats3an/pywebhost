@@ -63,7 +63,13 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
 
         Surely you are going to read the documents to make sth with this.
     '''
+    def handle_error(self, request : RequestHandler, client_address):
+        """Handle an error gracefully.  May be overridden.
 
+        By default,it does nothing
+        """
+        pass
+    
     def __handle__(self, request : RequestHandler):
         '''
         Maps the request with the `PathMaker`
