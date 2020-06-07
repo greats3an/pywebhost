@@ -35,6 +35,8 @@ class Websocket(Adapter):
 
             request = Websocket(request)
             request.handshake()
+            request.callback = recv_callback
+            request.serve()
             ...
     '''
 
@@ -57,7 +59,7 @@ class Websocket(Adapter):
         super().__init__(request,*a,**k)
 
     def handshake(self):
-        # Do Websocket handshake
+        '''Do Websocket handshake,must be done first after the request is parsed'''
         self.request.send_response(HTTPStatus.SWITCHING_PROTOCOLS)
         self.request.send_header('Connection', 'Upgrade')
         self.request.send_header('Sec-WebSocket-Accept',self.__ws_gen_responsekey(self.request.headers.get('Sec-WebSocket-Key')))
@@ -79,13 +81,13 @@ class Websocket(Adapter):
         '''
         pass
 
-    def send(self, PAYLOAD, FIN=1, OPCODE=WebsocketOpCode.TEXT, MASK=0):
+    def send(self, message:bytes, FIN=1, OPCODE=WebsocketOpCode.TEXT, MASK=0):
         '''
             Adds a message to the queue
 
             To send messages immediately,use `send_nowait` instead
         '''
-        self.queue.append(self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
+        self.queue.append(self.__websocket_constructframe(message, FIN, OPCODE, MASK))
 
     def receive(self):
         '''
