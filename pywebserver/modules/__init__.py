@@ -17,6 +17,14 @@ class HTTPModules():
         request.end_headers()
 
     @staticmethod
+    def RestrictVerbs(request:RequestHandler,verbs=['GET','POST']):
+        '''Restricts HTTP Verbs,does nothing if the restriction passes'''
+        if not request.command in verbs:
+            request.send_error(HTTPStatus.FORBIDDEN)
+            request.end_headers()
+            raise Exception('Verb %s is not allowed' % request.command)
+    
+    @staticmethod
     def IndexFolder(request:RequestHandler,path,stylesheet='',encoding='utf-8'):
         '''Automaticly indexes the folder to human readable HTML page'''
         if os.path.isfile(path):return HTTPModules.WriteFileHTTP(request,path)
