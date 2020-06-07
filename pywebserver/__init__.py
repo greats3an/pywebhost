@@ -1,9 +1,44 @@
-import socket
-import socketserver
-from .proto import Protocol,http,RelativeMapping
-from .handler import HTTPRequestHandler
-import os
-import urllib.parse
+import socket,socketserver,os,urllib.parse
+from .handler import RequestHandler
+from .modules import PathMakerModules
+from http import HTTPStatus
+
+class PathMaker(dict):
+    '''For storing and handling path mapping
+    
+        The keys and values are stored as functions.Or their addresses to be exact
+
+        Keys are used to check is the target URL matching the stored URL,which,using regexes will be a great idea
+
+        To set an item:
+
+            pathmaker[Absoulte('/')] = lambda a:SendFile('index.html')
+
+        Thus,the server will be finding the functions simply with this:
+
+            pathmaker['/']()
+
+        Easy,right?
+    '''
+    def __init__(self):
+        super().__init__()
+
+    def __setitem__(self, keytester, value):
+        '''
+        Setting an item '''
+        if not callable(keytester) or not callable(value):raise Exception('The keys & values must be callable')
+        return super().__setitem__(keytester, value)    
+
+    def __getitem__(self, key):
+        '''Iterates all keys to find matching one with the
+
+        Which,whatever comes up in the list first,has a higher chace of getting selected
+        '''
+        for keytester in self.keys():
+            if keytester(key):
+                return super().__getitem__(keytester)
+        return None
+
 class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     '''
         Base server class
@@ -15,104 +50,62 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
 
         __init__():
 
-                server_address  :   A tuple-like address,for example : `('localhost',1234)`
-                proto           :   A iterable of `Protocol`,for example : `[http.HTTP]`
-                config          :   Other misc config
+                server_address  :   A tuple-like address,for example : `('localhost',1234)`                
+
+        To start a server:
+
+            server = PyWebServer(('',1234))
+            server.serve_forever()
+
+        This way,you can test by typing `http://localhost:1234` into your browser
+        
+        And BEHOLD!An error page.
+
+        Surely you are going to read the documents to make sth with this.
     '''
 
-    def __handle__(self, handler : HTTPRequestHandler):
+    def __handle__(self, request : RequestHandler):
         '''
-        Handles the request
+        Maps the request with the `PathMaker`
         
-        handler should have `proto` property for the pre-determined protocol
+        The `request` is provided to the router
         '''
-        def check_for_absolute():
-            if not handler.command in self.absolute.keys():
-                # No suitable command
-                return 403
-            if not handler.path in self.absolute[handler.command].keys():            
-                # No suitable path
-                return 404
-            if not type(handler.proto) in self.absolute[handler.command][handler.path]:
-                # No suitable protocol
-                return 500
-            func = self.absolute[handler.command][handler.path][type(handler.proto)]
-            return func(handler)
+        method = self.paths[request.path]
+        if not method:
+            return request.send_error(HTTPStatus.NOT_FOUND)
+        return method(request)
 
-        def check_for_relative():
-            if not handler.command in self.relative.keys():return 403 # No command's matching up
-            pathdelta,path = 65534,''            
-            for url in self.relative[handler.command].keys():
-                # Does the path begin with the set mapping?
-                if handler.path[:len(url)] == url:
-                    # it beigns with such string
-                    delta = len(handler.path) - len(url)
-                    # How much does it deviate from the requested URL?
-                    if delta <= pathdelta:
-                        # Delta is smaller,choose this instead
-                        pathdelta = delta
-                        path = url
-            if not path:return 404 # No such local path mapper could map it? 404
-            # Now we have the closest match,lets continue
-            if not type(handler.proto) in self.relative[handler.command][path]:return 403 # No protocol is matching up
-            mapping = self.relative[handler.command][path][type(handler.proto)]
-            # Let the proto do the mapping
-            return handler.proto.__relative__(mapping)
-
-        code = check_for_absolute()
-
-        if code in range(300,600):
-            # Abnormal codes,check for relative now
-            code = check_for_relative()
-        
-        if code in range(300,600):
-            # Still not normal.Sends the error code
-            handler.send_response(code)
-            handler.end_headers()
-
-    def add_relative(self,command,path,protocol,modules:dict,**kw):
+    def route(self,keytester : PathMakerModules):
         '''
-        Adds a RELATIVE directory path to the maaping
+        Routes a HTTP Request
 
-        For example:
+        e.g:
 
-            server.path_relative('GET','/',http.HTTP,{
-                'file':http.Modules.write_file,
-                'folder':http.Modlues.index_folder
-            },local='html')
+            @server.route(Absoulte('/'))
+                def index():lambda a:SendFile('index.html')
         '''
-        if not command in self.relative.keys():self.relative[command] = {}
-        if not path in self.relative[command].keys():self.relative[command][path] = {}
-        self.relative[command][path][protocol] = RelativeMapping(path,modules,**kw)
-
-    def path_absolute(self,command,path,protocol):
-        '''
-        Decorator for ABSOLUTE path and its command
-        
-        For example:
-            
-            @server.path_absolute('GET','/',http.HTTP)
-            def root(handler):
-                handler.send_response(200)
-                handler.end_hedaers()
-                handler.wfile.write('Hello World!')
-
-        The method **SHOULD** return a HTTP error code afterwards
-
-        if it didn't send by itself,otherwise you *SHOULD NOT DO IT*
-        '''
-        def wrapper(func):
-            if not command in self.absolute.keys():self.absolute[command] = {}
-            if not path in self.absolute[command].keys():self.absolute[command][path] = {}
-            self.absolute[command][path][protocol] = func
-            return func
+        def wrapper(method):
+            self.paths[keytester] = method
+            return method
         return wrapper
 
-    def __init__(self, server_address : tuple,protos : list,**config):
-        self.absolute,self.relative = {},{}
-        # Absolute path and relative path to the root of the program
-        def GetHTTPRequestHandler(*args):
-            handler =  HTTPRequestHandler(*args,creator=self, protos=protos,**{'server_version':'PyWebServer'},**config)
-            # Always override the `server_version` field
-            return handler
-        super().__init__(server_address, GetHTTPRequestHandler)
+    def __init__(self, server_address : tuple):
+        self.paths = PathMaker()
+        # A paths dictionary which has `lambda` objects as keys
+        self.protocol_version = "HTTP/1.0"
+        # What protocol version to use.
+        # Here's a note:
+        # HTTP 1.1 will automaticly keep the connections alive,so
+        # `close_connection = True` needs to be called once the connection is done
+        self.error_message_format = """\
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <title>PyWebserver Error - %(code)d</title>
+</head>
+<body>
+    <center><h1>%(code)d %(message)s</h1></center>
+    <hr><center>%(explain)s - PyWebserver</center>
+</body>
+"""
+        # Error page format. %(`code`)d %(`message`)s %(`explain`)s are usable
+        super().__init__(server_address, RequestHandler)

@@ -1,9 +1,10 @@
-class Confidence:
+from ..handler import RequestHandler
+class AdapterConfidence:
     '''
         A pack of confidence mapping types
     '''
     @staticmethod
-    def const(handler,weights : int):
+    def const(request,weights : int):
         '''
             Returns a constant value that DOES NOT change not matter what happens
             
@@ -16,7 +17,7 @@ class Confidence:
         return weights
 
     @staticmethod
-    def headers(handler,weights : dict):
+    def headers(request,weights : dict):
         '''
             Confidence that are `headers` weighted,passes header
         
@@ -31,13 +32,13 @@ class Confidence:
                 }            
         '''
         confidence = 0.00
-        headers = dict(handler.headers)
+        headers = dict(request.headers)
         for header,value in headers.items():
             if header in weights.keys():
                 confidence += weights[header](value)
         return confidence
     @staticmethod
-    def commmand(handler,weights : dict):
+    def commmand(request,weights : dict):
         '''
             Confidence that are `command` weighted,passes command (GET,POST,OPTION,etc)
         
@@ -54,11 +55,11 @@ class Confidence:
                 }
                 - Note that the command should always be CAPITAL
         '''
-        confidence = weights[handler.command] if handler.command in weights.keys() else 0
+        confidence = weights[request.command] if request.command in weights.keys() else 0
         return confidence
 
     @staticmethod
-    def scheme(handler,weights : dict):
+    def scheme(request,weights : dict):
         '''
             Confidence that are `scheme` weighted,passes scheme
         
@@ -73,69 +74,44 @@ class Confidence:
                 }
                 - Note that the scheme should always be non-capital
         '''
-        confidence = weights[handler.scheme] if handler.scheme in weights.keys() else 0
+        confidence = weights[request.scheme] if request.scheme in weights.keys() else 0
         return confidence
 
-class RelativeModules():
-    '''
-        RelativeModules base class
-
-        A `RelativeModule` Method must take two postional arguments and must be static: 
-            
-        `proto` (A `Protocol` Object) and `path` (The requested resoure)
-
-    '''
+class Adapter():
     @staticmethod
-    def dummy_module(proto,rel_path:str,*a,**k):
+    def __confidence__(request,weights):
         '''
-        Dummy module,just for show
-        '''
-        pass
+            Base `confidence` method,approximates how well will the apdapter fit
+            the request
 
-class RelativeMapping():
-    def __init__(self,path,modules:dict,**kw):
-        '''
-            path    :   URL base path
-
-            modules :   A `dict`,has `str` for keys and `RelativeModule` methods for values
-
-            -   For example,to do diffrent things for `file` and `folder` of HTTP module:
-
-                    RelativeMapping(path='/',local='html',modules={
-                        'file':http.Modules.write_file,
-                        'folder':http.Modlues.index_folder
-                    })                
-        '''
-        self.path = path # URL base
-        self.modules = modules # How to deal with different types of files
-        for k,v in kw.items():
-            # Also writes new things here
-            setattr(self,k,v)
-        super().__init__()
-
-class Protocol():
-    @staticmethod
-    def __confidence__(handler,weights):
-        '''
-            Base `confidence` method
-
-            `handler`   :   A `HTTPRequestHandler` Object
+            `request`   :   A `RequestHandler` Object
 
             `weights`   :   `Dict` with `Confidence` method as keys,see `Confidence` module for help
         '''
         confidence = 0.00
         for m_confidence in weights.keys():
-            confidence += m_confidence(handler,weights[m_confidence])
+            confidence += m_confidence(request,weights[m_confidence])
         return confidence
 
-    def __relative__(self,mapping : RelativeMapping):
-        '''Handles the relative path'''
+    def __init__(self,request:RequestHandler,ignore_confidence=False):
+        '''Initiaztes the adapter with given request
+        
+           Use `ignore_confidence=True` to bypass `confidence` checking
+        '''
+        self.request = request
+        if not ignore_confidence and self.__confidence__(request) < 0.3:
+            '''Raise an exception if the confidence is too low'''
+            raise Exception("Confidence for '%s' is too low (%s)" % (self.__name__,self.__confidence__(request)))
         return
 
-    def __init__(self,handler):
-        '''Initiaztes the protocol with HTTPHandler'''
-        self.handler = handler
-        return
+    def send(self,message):
+        '''I/O Output method,needs to be overriden'''
+        pass
+
+    def receive(self,message):
+        '''I/O Input method,needs to be overriden'''
+        pass
+
 import os
 __all__ = [i[:-3] for i in os.listdir(os.path.dirname(__file__)) if i[-2:] == 'py' and i != '__init__.py']
 from . import *

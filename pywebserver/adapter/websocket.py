@@ -4,12 +4,11 @@
 Offers simple ways of dealing with WS connections
 '''
 import logging,time,struct,random,base64,hashlib,typing,select
-from . import Protocol,Confidence
-
-
+from . import Adapter,AdapterConfidence
+from http import HTTPStatus
 from enum import IntEnum
 
-class WebsocketOPCODE(IntEnum):
+class WebsocketOpCode(IntEnum):
     CONTINUATION = 0x0
     TEXT = 0x1
     BINARY = 0x2
@@ -17,49 +16,58 @@ class WebsocketOPCODE(IntEnum):
     PING = 0x9
     PONG = 0xA
 
-class Websocket(Protocol):
+class Websocket(Adapter):
     '''
-        # Websocket object
+        # Websocket Adapter
 
-        - handler          :       RequestHandler object
-        - handshake       :       Performs the handshake,**MUST** be done before any further operation
+        - request          :      BaseHandler request
+        - handshake        :       Performs the handshake,**MUST** be done before any further operation
         - serve            :       Starts serving the client and blocks the thread
             - Performing `run` will block the current request thread until either the server / client decides to close the connection
         - send            :       put message into queue,then it will be sent later if possible
         - receive         :       immediately recieve a frame
-        - callback_receive:       callback for received frame
+        - callback        :       callback for received frame
             - Called once the packet is received
         - shutdown
             - This will set the kill switch,and wait for the session to actually end
+
+        eg:
+
+            request = Websocket(request)
+            request.handshake()
+            ...
     '''
 
     @staticmethod
-    def __confidence__(handler) -> float:
+    def __confidence__(request) -> float:
         '''Websocket confidence,ranges from 0~1'''
-        return super(Websocket,Websocket).__confidence__(handler,{
-            Confidence.headers:{
+        return super(Websocket,Websocket).__confidence__(request,{
+            AdapterConfidence.headers:{
                 'Sec-WebSocket-Key':lambda v:1 if v and len(v) > 8 else 0
             }
         })
 
-    def __init__(self,handler):  
-        '''Creates the websocket object'''  
+    def __init__(self,request,*a,**k):  
+        '''Creates the websocket object
+        
+           Use `ignore_confidence=True` to bypass `confidence` checking
+        '''  
         self.keep_alive,self.is_shutdown,self.handshook = True,False,False
         self.queue = []
-        super().__init__(handler)
+        super().__init__(request,*a,**k)
 
     def handshake(self):
         # Do Websocket handshake
-        self.handler.send_response(101)
-        self.handler.send_header('Connection', 'Upgrade')
-        self.handler.send_header('Sec-WebSocket-Accept',self.__ws_gen_responsekey(self.handler.headers.get('Sec-WebSocket-Key')))
-        self.handler.send_header('Upgrade', 'websocket')
-        self.handler.end_headers()
-        self.handler.wfile.flush()
-        self.handler.log_message('New Websocket session from %s:%s' % self.handler.client_address)   
+        self.request.send_response(HTTPStatus.SWITCHING_PROTOCOLS)
+        self.request.send_header('Connection', 'Upgrade')
+        self.request.send_header('Sec-WebSocket-Accept',self.__ws_gen_responsekey(self.request.headers.get('Sec-WebSocket-Key')))
+        self.request.send_header('Upgrade', 'websocket')
+        self.request.end_headers()
+        self.request.wfile.flush()
+        self.request.log_message('New Websocket session from %s:%s' % self.request.client_address)   
         self.handshook = True
     
-    def callback_receive(self, frame) -> tuple:
+    def callback(self, frame) -> tuple:
         '''
             Callback funtionality.Executes after `frame` is received
 
@@ -71,27 +79,43 @@ class Websocket(Protocol):
         '''
         pass
 
+    def send(self, PAYLOAD, FIN=1, OPCODE=WebsocketOpCode.TEXT, MASK=0):
+        '''
+            Adds a message to the queue
+
+            To send messages immediately,use `send_nowait` instead
+        '''
+        self.queue.append(self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
+
+    def receive(self):
+        '''
+            Receives a single frame immediately
+        '''
+        try:
+            return self.__websocket_recieveframe(self.request.rfile)
+        except Exception:
+            return None
 
     def handle_once(self):
         '''Handles IO event for once'''
         # Using select() to process selectable IOs
         if not self.handshook:self.handshake()
         # Handshake if not already
-        inputs,outputs,error = select.select([self.handler.request], [self.handler.request], [],1.0)
+        inputs,outputs,error = select.select([self.request.request], [self.request.request], [],1.0)
         if inputs:
             # target socket is ready to send,process frame,then callback
             if (frame:= self.receive()):
-                if frame[4] == WebsocketOPCODE.CLOSE_CONN:
+                if frame[4] == WebsocketOpCode.CLOSE_CONN:
                     # client requested to close connection
-                    self.send_nowait(b'', OPCODE=WebsocketOPCODE.CLOSE_CONN)
+                    self.send_nowait(b'', OPCODE=WebsocketOpCode.CLOSE_CONN)
                     # accepts such request
-                    raise Exception('Client %s:%s requested to close connection' % self.handler.client_address)
-                self.callback_receive(frame)
+                    raise Exception('Client requested to close Websocket connection')
+                self.callback(frame)
         if outputs:
             # target socket is ready to receive,sending frame from the top of the list
             if self.queue:
                 # is there anything in queue?
-                self.handler.wfile.write(self.queue.pop(0))
+                self.request.wfile.write(self.queue.pop(0))
 
     def serve(self,pool_interval=0.01):
         '''
@@ -104,40 +128,25 @@ class Websocket(Protocol):
                 # How frequent will we poll?
             except Exception as e:
                 # Quit once any exception occured
-                self.handler.log_error(str(e))
+                self.request.log_error(str(e))
                 self.keep_alive = False
-        self.handler.log_request('Websocket Connection closed:%s:%s' % self.handler.client_address)
+        self.request.log_request('Websocket Connection closed')
         self.is_shutdown = True
 
-    def send_nowait(self, PAYLOAD, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
+    def send_nowait(self, PAYLOAD, FIN=1, OPCODE=WebsocketOpCode.TEXT, MASK=0):
         '''
-            Sends a constructed message without putting it inside the queue
+            Sends a constructed message immediately
         '''
-        self.handler.wfile.write(self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
-        self.handler.wfile.flush()
-
-    def send(self, PAYLOAD, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
-        '''
-            Adds a constructed message to the queue
-        '''
-        self.queue.append(self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
-
-    def receive(self):
-        '''
-            Receives a single frame
-        '''
-        try:
-            return self.__websocket_recieveframe(self.handler.rfile)
-        except Exception:
-            return None
+        self.request.wfile.write(self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
+        self.request.wfile.flush()
     
     def shutdown(self):
         '''Sets kill switch,and wait for the loop to end'''
-        self.send_nowait(b'', OPCODE=WebsocketOPCODE.CLOSE_CONN)
+        self.send_nowait(b'', OPCODE=WebsocketOpCode.CLOSE_CONN)
         self.keep_alive = False
         while not self.is_shutdown:pass
 
-    def __websocket_constructframe(self, data: bytearray, FIN=1, OPCODE=WebsocketOPCODE.TEXT, MASK=0):
+    def __websocket_constructframe(self, data: bytearray, FIN=1, OPCODE=WebsocketOpCode.TEXT, MASK=0):
         '''
         Constructing frame
 
@@ -216,7 +225,7 @@ class Websocket(Protocol):
             +---------------------------------------------------------------+
         '''
         if not rfile:
-            rfile = self.handler.rfile
+            rfile = self.request.rfile
         b1, b2 = rfile.read(2)
         FIN, RSV1, RSV2, RSV3 = self.__extract_byte(b1)[:4]
         OPCODE = self.__construct_byte(self.__extract_byte(b1)[4:])
