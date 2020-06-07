@@ -65,12 +65,12 @@ def websocket(request : RequestHandler):
     ws.handshake()
     def callback(msg):
         print(msg)
-        ws.send(b'ok i know')
+        ws.send(b'recevied:' + msg[-1])
     ws.callback = callback
     ws.serve()
 
 server.error_message_format = f'<style>{GetStyleSheet()}</style>' + server.error_message_format
 # Adds the style sheet to the error page
 
-print('servering now')
+print('Serving http://localhost:3331 & ws://localhost:3331/ws')
 server.serve_forever()
