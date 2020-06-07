@@ -6,7 +6,10 @@ class Utilties():
     def GuessMIME(path):
         '''Guesses a file's MIME type'''
         return mimetypes.MimeTypes().guess_type(path)[0]
-
+class UnfinishedException(Exception):
+    '''Exceptions that are non-fatal,and did't affect the response'''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 class HTTPModules():
     '''Modules that are designed for HTTP Adapters'''
     @staticmethod
@@ -20,9 +23,7 @@ class HTTPModules():
     def RestrictVerbs(request:RequestHandler,verbs=['GET','POST']):
         '''Restricts HTTP Verbs,does nothing if the verb is in the `verbs` list'''
         if not request.command in verbs:
-            request.send_error(HTTPStatus.FORBIDDEN)
-            request.end_headers()
-            raise Exception('Verb %s is not allowed' % request.command)
+            raise UnfinishedException('Verb %s is not allowed' % request.command)
     
     @staticmethod
     def IndexFolder(request:RequestHandler,path,stylesheet='',encoding='utf-8'):

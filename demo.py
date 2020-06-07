@@ -51,10 +51,17 @@ pre {
     line-height: 2em;
 }'''
 # Stylesheet!
-
-@server.route(PathMakerModules.Absolute('/'))
+IndexPath = PathMakerModules.Absolute('/')
+# For same paths,use *one* variable to refence them
+# Otherwise,only the first declared path will be accessable
+@server.route(IndexPath)
 def index(request : RequestHandler):
     HTTPModules.RestrictVerbs(request,['POST'])
+    HTTPModules.Redirect(request,'files')
+
+@server.route(IndexPath)
+def index(request : RequestHandler):
+    HTTPModules.RestrictVerbs(request,['GET'])
     HTTPModules.Redirect(request,'files')
 
 @server.route(PathMakerModules.DirectoryPath('/files/'))

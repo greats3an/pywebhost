@@ -1,6 +1,6 @@
 import socket,socketserver,os,urllib.parse
 from .handler import RequestHandler
-from .modules import PathMakerModules
+from .modules import PathMakerModules,UnfinishedException
 from http import HTTPStatus
 
 class PathMaker(dict):
@@ -25,14 +25,18 @@ class PathMaker(dict):
 
     def __setitem__(self, keytester, value):
         '''
-        Setting an item '''
+        Setting an item,multiple values can be stacked '''
         if not callable(keytester) or not callable(value):raise Exception('The keys & values must be callable')
-        return super().__setitem__(keytester, value)    
+        try:
+            return super().__setitem__(keytester, super().__getitem__(keytester) + [value])
+        except KeyError:
+            super().__setitem__(keytester, [value])
+        # Initalizes with an empty list
 
     def __getitem__(self, key):
-        '''Iterates all keys to find matching one with the
+        '''Iterates all keys to find matching one
 
-        Which,whatever comes up in the list first,has a higher chace of getting selected
+        Which,whatever comes up in the list first,has a higher chace of getting sele
         '''
         for keytester in self.keys():
             if keytester(key):
@@ -76,10 +80,20 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         
         The `request` is provided to the router
         '''
-        method = self.paths[request.path]
-        if not method:
+        methods = self.paths[request.path]
+        if not methods:
             return request.send_error(HTTPStatus.NOT_FOUND)
-        return method(request)
+        for method in methods:
+            try:
+                return method(request)
+                # Succeed,end this handle call
+            except UnfinishedException as e:
+                # Ignore UnfinishedException and go on
+                pass
+        # No fatal exceptions,assume the response is unfinished
+        request.send_error(HTTPStatus.FORBIDDEN)
+        request.end_headers()
+        # Give out HTTP 403 error
 
     def route(self,keytester : PathMakerModules):
         '''
