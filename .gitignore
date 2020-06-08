@@ -3,7 +3,7 @@ __pycahce__
 *.pyc
 \!*
 html
-test
+test*
 *.exe
 *.dll
 *.build
