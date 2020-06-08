@@ -27,7 +27,7 @@ class HTTPModules():
     
     @staticmethod
     def IndexFolder(request:RequestHandler,path,stylesheet='',encoding='utf-8'):
-        '''Automaticly indexes the folder to human readable HTML page'''
+        '''Automaticly indexes the folder and renders a human readable HTML page'''
         if os.path.isfile(path):return HTTPModules.WriteFileHTTP(request,path)
         # Call `WriteFileHTTP` if we are somehow given a file path
         request.send_response(HTTPStatus.OK)

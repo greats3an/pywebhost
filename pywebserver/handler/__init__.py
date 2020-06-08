@@ -345,9 +345,6 @@ class RequestHandler(StreamRequestHandler):
         default it passes the message on to log_message().
 
         Arguments are the same as for log_message().
-
-        XXX This should go to the separate error log.
-
         """
         self.logger.error(self.format_log(format,*args))        
 
@@ -366,7 +363,7 @@ class RequestHandler(StreamRequestHandler):
         The formats are decided by `format_log`
 
         """
-        self.logger.debug(self.format_log(format,*args))
+        self.logger.info(self.format_log(format,*args))
     
     """
     Properties.These funtions do nothing but providing documents

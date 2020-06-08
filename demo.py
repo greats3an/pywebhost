@@ -57,25 +57,46 @@ IndexPath = PathMakerModules.Absolute('/')
 @server.route(IndexPath)
 def index(request : RequestHandler):
     HTTPModules.RestrictVerbs(request,['POST'])
+    # This is how you map certain HTTP Verbs to the same path
     HTTPModules.Redirect(request,'files')
 
 @server.route(IndexPath)
 def index(request : RequestHandler):
     HTTPModules.RestrictVerbs(request,['GET'])
+    # Redirects to '/files'
     HTTPModules.Redirect(request,'files')
 
 @server.route(PathMakerModules.DirectoryPath('/files/'))
 def subfolder(request : RequestHandler):
+    # Indexes folders of local path and renders a webpage
     HTTPModules.IndexFolder(request,'./' + request.path[7:],GetStyleSheet())
+
+ws_list = []
 @server.route(PathMakerModules.Absolute('/ws'))
 def websocket(request : RequestHandler):
+    # A simple WebSocket echo server,which will boardcast
+    # Message to all connected sessions
     ws = Websocket(request)
+    ws_list.append(ws)
+    # Store the session
     ws.handshake()
-    def callback(msg):
-        print(msg)
-        ws.send(b'recevied:' + msg[-1])
+    ws.send_nowait(b'<b>Name yourself:</b>')
+    def callback(msg):   
+        if not hasattr(ws,'name'):
+            # 1st message,aquire username
+            setattr(ws,'name', msg[-1].decode())
+            ws.send(f'<b>Welcome,{ws.name}</b>...<i>Online users:{",".join([ws_.name if hasattr(ws_,"name") else "[PENDING]" for ws_ in ws_list])}</i>'.encode())                       
+            return
+        for ws_ in ws_list:
+            if ws != ws_:ws_.send(
+                f'{ws.name} says: {msg[-1].decode()}'.encode()
+            )
+            # Avoid sending to ourself
+        ws.send(('<i>[your message has been sent to %s other members]</i>' % (len(ws_list) - 1)).encode())
     ws.callback = callback
     ws.serve()
+    ws_list.remove(ws)
+    # Removes session after it closes
 
 server.error_message_format = f'<style>{GetStyleSheet()}</style>' + server.error_message_format
 # Adds the style sheet to the error page
