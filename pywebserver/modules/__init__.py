@@ -43,7 +43,7 @@ class HTTPModules():
     <h1>Index of {path}</h1>
     <hr><pre><a href="..">..</a>\n'''
         for item in os.listdir(path):
-            html += f'<a href="{request.path}/{item}"/>{item}</a>\n'
+            html += f'<a href="{item}/"/>{item}/</a>\n' if os.path.isdir(os.path.join(path,item)) else f'<a href="{item}"/>{item}</a>\n'
         html+= f'''</pre><hr><body>\n'''
         HTTPModules.WriteString(request,html)
         request.wfile.flush()
