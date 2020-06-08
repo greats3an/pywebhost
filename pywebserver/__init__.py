@@ -70,9 +70,10 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     def handle_error(self, request : RequestHandler, client_address):
         """Handle an error gracefully.  May be overridden.
 
-        By default,it does nothing
+        By default,it does stack trace
         """
-        pass
+        super().handle_error(request,client_address)
+
     
     def __handle__(self, request : RequestHandler):
         '''
