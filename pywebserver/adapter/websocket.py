@@ -119,15 +119,21 @@ class Websocket(Adapter):
                 # is there anything in queue?
                 self.request.wfile.write(self.queue.pop(0))
 
-    def serve(self,pool_interval=0.01):
+    def serve(self,ping_interval=10):
         '''
             Starts processing I/O,and blocks until connection is closed or flag is set
+
+                ping_interval   :   WS `Ping` heartbeat interval,set `0` to disable it
         '''
+        tick_ping = 0
         while self.keep_alive:
             try:
                 self.handle_once()
-                time.sleep(pool_interval)
-                # How frequent will we poll?
+                if ping_interval and time.time() - tick_ping >= ping_interval:
+                    self.send(b'',OPCODE=WebsocketOpCode.PING)
+                    tick_ping = time.time()
+                time.sleep(0.001)
+                # This hack was added to avoid high CPU cost...*sigh*
             except Exception as e:
                 # Quit once any exception occured
                 self.request.log_error(str(e))

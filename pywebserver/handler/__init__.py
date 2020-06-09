@@ -36,7 +36,6 @@ class RequestHandler(StreamRequestHandler):
         self.protocol_version = server.protocol_version
         # Error page formats
         self.error_message_format = server.error_message_format
-        
         # hack to maintain backwards compatibility
         self.responses = {
             v: (v.phrase, v.description)
