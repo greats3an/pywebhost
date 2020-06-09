@@ -270,8 +270,9 @@ class RequestHandler(StreamRequestHandler):
                     message = ''
             if not hasattr(self, '_headers_buffer'):
                 self._headers_buffer = []
-            self._headers_buffer.append(("%s %d %s\r\n" %(self.protocol_version, code, message)).encode('latin-1', 'strict'))
-
+            self._headers_buffer = [("%s %d %s\r\n" % (self.protocol_version, code, message)).encode('latin-1', 'strict')] + self._headers_buffer
+            # Always send this at the begining
+    
     def send_header(self, keyword, value):
         """Send a MIME header to the headers buffer."""
         if self.request_version != 'HTTP/0.9':
