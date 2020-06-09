@@ -51,23 +51,29 @@ pre {
     line-height: 2em;
 }'''
 # Stylesheet!
-IndexPath = PathMakerModules.Absolute('/')
-# For same paths,use *one* variable to refence them
-# Otherwise,only the first declared path will be accessable
-@server.route(IndexPath)
+# Multiple items of the same path will be tested if previous handler raised `UnfinishedException`
+@server.route(PathMakerModules.Absolute('/'))
 def index(request : RequestHandler):
     HTTPModules.RestrictVerbs(request,['POST'])
-    # This is how you map certain HTTP Verbs to the same path
-    HTTPModules.Redirect(request,'files')
+    # This is to show how you map certain HTTP Verbs to the same path
+    # Visiting with a web browser will cause UnfinishedException
+    # As it uses verb `GET` for getting webpages.
+    # Thus,the next `index()` is called since they share the same path
 
-@server.route(IndexPath)
+@server.route(PathMakerModules.Absolute('/'))
 def index(request : RequestHandler):
     HTTPModules.RestrictVerbs(request,['GET'])
-    # Redirects to '/files'
+    # Redirects to 'files'
     HTTPModules.Redirect(request,'files')
 
+@server.route(PathMakerModules.Absolute('/files'))
+def files(request : RequestHandler):
+    HTTPModules.RestrictVerbs(request,['GET'])
+    # Redirects to 'files/'
+    HTTPModules.Redirect(request,'files/')
+
 @server.route(PathMakerModules.DirectoryPath('/files/'))
-def subfolder(request : RequestHandler):
+def files(request : RequestHandler):
     # Indexes folders of local path and renders a webpage
     HTTPModules.IndexFolder(request,'./' + request.path[7:],GetStyleSheet())
 

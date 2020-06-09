@@ -27,10 +27,8 @@ class PathMaker(dict):
         '''
         Setting an item,multiple values can be stacked '''
         if not callable(keytester) or not callable(value):raise Exception('The keys & values must be callable')
-        try:
-            return super().__setitem__(keytester, super().__getitem__(keytester) + [value])
-        except KeyError:
-            super().__setitem__(keytester, [value])
+        super().__setitem__(keytester,value)
+
         # Initalizes with an empty list
 
     def __getitem__(self, key):
@@ -40,8 +38,7 @@ class PathMaker(dict):
         '''
         for keytester in self.keys():
             if keytester(key):
-                return super().__getitem__(keytester)
-        return None
+                yield super().__getitem__(keytester)
 
 class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     '''
@@ -81,16 +78,19 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         
         The `request` is provided to the router
         '''
-        methods = self.paths[request.path]
-        if not methods:
-            return request.send_error(HTTPStatus.NOT_FOUND)
-        for method in methods:
+        excepted_excptions = 0
+        for method in self.paths[request.path]:
             try:
                 return method(request)
                 # Succeed,end this handle call
-            except UnfinishedException as e:
+            except UnfinishedException:
                 # Ignore UnfinishedException and go on
-                pass
+                excepted_excptions += 1
+            except Exception as e:
+                # For Other server-side exceptions,let the client know
+                return request.send_error(HTTPStatus.SERVICE_UNAVAILABLE,explain=e)
+        # Request's not handled,and no UnfinishedException is ever called:No URI matched
+        if not excepted_excptions:return request.send_error(HTTPStatus.NOT_FOUND)
         # No fatal exceptions,assume the response is unfinished
         request.send_error(HTTPStatus.FORBIDDEN)
         request.end_headers()

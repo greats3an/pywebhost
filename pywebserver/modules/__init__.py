@@ -42,7 +42,7 @@ class HTTPModules():
 <body>
     <h1>Index of {path}</h1>
     <hr><pre><a href="..">..</a>\n'''
-        for item in os.listdir(path):
+        for item in sorted(os.listdir(path)):
             html += f'<a href="{item}/"/>{item}/</a>\n' if os.path.isdir(os.path.join(path,item)) else f'<a href="{item}"/>{item}</a>\n'
         html+= f'''</pre><hr><body>\n'''
         HTTPModules.WriteString(request,html)
@@ -158,7 +158,7 @@ class PathMakerModules():
             if path[:len(target)] == target:
                 # the url begins with the target path with the backslash
                 return True            
-            return PathMakerModules.AbsoluteWithoutCaps(target[:-1])(path)
+            return PathMakerModules.Absolute(target[:-1])(path)
             # Otherwise,if the path is exactly the same as the target
             # without backslash,still returns True.Otherwise False
         return check
