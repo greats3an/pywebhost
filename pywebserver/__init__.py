@@ -7,7 +7,6 @@ class PathMaker(dict):
     '''For storing and handling path mapping
     
         The keys and values are stored as functions.Or their addresses to be exact
-
         Keys are used to check is the target URL matching the stored URL,which,using regexes will be a great idea
 
         To set an item:
@@ -42,24 +41,14 @@ class PathMaker(dict):
 
 class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     '''
-        Base server class
-
-        The `__handle__` method handles all HTTP based requests,
-
-        Notes:
-        -   Server will check absolute mapping first,then the Direcotry file mapping
-
-        __init__():
-
-                server_address  :   A tuple-like address,for example : `('localhost',1234)`                
-
+        # PyWebServer
+        
         To start a server:
 
             server = PyWebServer(('',1234))
             server.serve_forever()
 
         This way,you can test by typing `http://localhost:1234` into your browser
-        
         And BEHOLD!An error page.
 
         Surely you are going to read the documents to make sth with this.
@@ -67,7 +56,7 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     def handle_error(self, request : RequestHandler, client_address):
         """Handle an error gracefully.  May be overridden.
 
-        By default,it does stack trace
+        By default,it prints the latest stack trace
         """
         super().handle_error(request,client_address)
 

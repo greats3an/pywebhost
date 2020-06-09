@@ -127,7 +127,6 @@ class PathMakerModules():
     Provides static methods for `PathMaker` to map paths
 
     The methods,takes 1 string argument and returns a `callable`,
-
     which again,takes 1 string argument then returns a bool value
     '''
     @staticmethod
