@@ -1,12 +1,12 @@
 from pywebserver import PyWebServer
 from pywebserver.modules import HTTPModules,PathMakerModules,HTTPStatus
 from pywebserver.handler import RequestHandler
-from pywebserver.adapter.websocket import Websocket
+from pywebserver.adapter.websocket import Websocket,WebsocketFrame
 import coloredlogs,io
 coloredlogs.install(level=0)
 # For coloring logs
 
-server = PyWebServer(('localhost',3331))
+server = PyWebServer(('',3310))
 # Initializes the server without binding it
 
 def GetStyleSheet():return '''
@@ -20,13 +20,17 @@ body {
     background-color: #2d2d2d;
 }
 
-a,center {
-    color: #666;
+a,center,span {
+    color: #CCC;
     text-decoration: none;
     transition: all 0.1s linear;
 }
 
-a:hover {
+p {
+    color: #999;
+}
+
+a:hover,span:hover {
     color: #ffcc66;
 }
 
@@ -51,29 +55,15 @@ pre {
     line-height: 2em;
 }'''
 # Stylesheet!
-# Multiple items of the same path will be tested if previous handler raised `UnfinishedException`
-@server.route(PathMakerModules.Absolute('/'))
-def index(request : RequestHandler):
-    HTTPModules.RestrictVerbs(request,['POST'])
-    # This is to show how you map certain HTTP Verbs to the same path
-    # Visiting with a web browser will cause UnfinishedException
-    # As it uses verb `GET` for getting webpages.
-    # Thus,the next `index()` is called since they share the same path
-
-@server.route(PathMakerModules.Absolute('/'))
-def index(request : RequestHandler):
-    HTTPModules.RestrictVerbs(request,['GET'])
-    # Redirects to 'files'
-    HTTPModules.Redirect(request,'files')
 
 @server.route(PathMakerModules.Absolute('/files'))
-def files(request : RequestHandler):
+def index(request : RequestHandler):
     HTTPModules.RestrictVerbs(request,['GET'])
-    # Redirects to 'files/'
+    # Redirects to '/files'
     HTTPModules.Redirect(request,'files/')
 
 @server.route(PathMakerModules.DirectoryPath('/files/'))
-def files(request : RequestHandler):
+def subfolder(request : RequestHandler):
     # Indexes folders of local path and renders a webpage
     HTTPModules.IndexFolder(request,'./' + request.path[7:],GetStyleSheet())
 
@@ -86,26 +76,34 @@ def websocket(request : RequestHandler):
     ws_list.append(ws)
     # Store the session
     ws.handshake()
-    ws.send_nowait(b'<b>Name yourself:</b>')
-    def callback(msg):   
+    ws.send_nowait('<b>Name yourself:</b>')
+    def others():return ",".join([ws_.name if hasattr(ws_,"name") else "[PENDING]" for ws_ in ws_list if ws_ != ws])
+    def callback(msg:WebsocketFrame):   
+        if msg.OPCODE == Websocket.PONG:return
         if not hasattr(ws,'name'):
             # 1st message,aquire username
-            setattr(ws,'name', msg[-1].decode())
-            ws.send(f'<b>Welcome,{ws.name}</b>...<i>Online users:{",".join([ws_.name if hasattr(ws_,"name") else "[PENDING]" for ws_ in ws_list])}</i>'.encode())                       
+            setattr(ws,'name', msg.PAYLOAD.decode())
+            ws.send(f'<b>Welcome,{ws.name}</b>...<i>Other online users:{others()}</i>')
             return
         for ws_ in ws_list:
-            if ws != ws_:ws_.send(
-                f'{ws.name} says: {msg[-1].decode()}'.encode()
-            )
-            # Avoid sending to ourself
-        ws.send(('<i>[your message has been sent to %s other members]</i>' % (len(ws_list) - 1)).encode())
+            if ws != ws_:ws_.send(f'{ws.name} says: {msg[-1].decode()}')
+            # Avoid sending to ourselfS
+        ws.send('<i>[your message has been sent to %s other members (%s)]</i>' % (len(ws_list) - 1,others()))
     ws.callback = callback
     ws.serve()
     ws_list.remove(ws)
     # Removes session after it closes
 
+
+@server.route(PathMakerModules.Absolute('/'))
+def index(request : RequestHandler):
+    # Indexes folders of local path and renders a webpage
+    ws_html = io.BytesIO((f'<style>{GetStyleSheet()}</style>' + open('demo_ws.html',encoding='utf-8').read()).encode(encoding='utf-8'))
+    request.send_header('Content-Type','text/html; charset=utf-8')
+    HTTPModules.WriteFileHTTP(request,ws_html)
+
 server.error_message_format = f'<style>{GetStyleSheet()}</style>' + server.error_message_format
 # Adds the style sheet to the error page
 
-print('Serving http://localhost:3331 & ws://localhost:3331/ws')
+print('Serving...http://localhost:3310')
 server.serve_forever()

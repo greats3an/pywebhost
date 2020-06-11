@@ -296,7 +296,7 @@ class RequestHandler(StreamRequestHandler):
         """
         if isinstance(code, HTTPStatus):
             code = code.value
-        self.log_message('"%s" %s %s',self.requestline, str(code), self.useragent_string())
+        self.log_debug('"%s" %s %s',self.requestline, str(code), self.useragent_string())
 
     def address_string(self):
         """Return the client address."""
@@ -336,6 +336,15 @@ class RequestHandler(StreamRequestHandler):
         Arguments are the same as for log_message().
         """
         self.logger.error(self.format_log(format,*args))        
+
+    def log_debug(self, format, *args):
+        """Log a debug message.
+
+        This is called when a request is done
+
+        Arguments are the same as for log_message().
+        """
+        self.logger.debug(self.format_log(format,*args))        
 
     def log_message(self, format, *args):
         """Log an arbitrary message.

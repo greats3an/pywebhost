@@ -8,13 +8,18 @@ from . import Adapter,AdapterConfidence
 from http import HTTPStatus
 from enum import IntEnum
 
-class WebsocketOpCode(IntEnum):
-    CONTINUATION = 0x0
-    TEXT = 0x1
-    BINARY = 0x2
-    CLOSE_CONN = 0x8
-    PING = 0x9
-    PONG = 0xA
+class WebsocketFrame():
+    '''# WebsocketFrame'''
+    encoding = 'utf-8'
+    @staticmethod
+    def bytes(d):
+        if isinstance(d,str):return d.encode(encoding=WebsocketFrame.encoding)
+        if isinstance(d,bytearray) or isinstance(d,bytes): return d
+        return WebsocketFrame.bytes(str(d))
+
+    def __init__(self,FIN=1,RSV1=0,RSV2=0,RSV3=0,OPCODE=1,MASK=0,PAYLOAD_LENGTH=0,MASKEY=0,PAYLOAD=b''):
+        self.FIN,self.RSV1,self.RSV2,self.RSV3,self.OPCODE,self.MASK,self.PAYLOAD_LENGTH,self.MASKEY,self.PAYLOAD = FIN,RSV1,RSV2,RSV3,OPCODE,MASK,PAYLOAD_LENGTH,MASKEY,self.bytes(PAYLOAD)
+        super().__init__()
 
 class Websocket(Adapter):
     '''
@@ -39,7 +44,13 @@ class Websocket(Adapter):
             request.serve()
             ...
     '''
-
+    # Websocket OpCodes
+    CONTINUATION = 0x0
+    TEXT = 0x1
+    BINARY = 0x2
+    CLOSE_CONN = 0x8
+    PING = 0x9
+    PONG = 0xA
     @staticmethod
     def __confidence__(request) -> float:
         '''Websocket confidence,ranges from 0~1'''
@@ -66,7 +77,7 @@ class Websocket(Adapter):
         self.request.send_header('Upgrade', 'websocket')
         self.request.end_headers()
         self.request.wfile.flush()
-        self.request.log_message('New Websocket session from %s:%s' % self.request.client_address)   
+        self.request.log_request('New Websocket session from %s:%s' % self.request.client_address)   
         self.handshook = True
     
     def callback(self, frame) -> tuple:
@@ -81,15 +92,15 @@ class Websocket(Adapter):
         '''
         pass
 
-    def send(self, message:bytes, FIN=1, OPCODE=WebsocketOpCode.TEXT, MASK=0):
+    def send(self,frame:WebsocketFrame):
         '''
             Adds a message to the queue
 
             To send messages immediately,use `send_nowait` instead
         '''
-        self.queue.append(self.__websocket_constructframe(message, FIN, OPCODE, MASK))
+        return self.queue.append(self.__websocket_constructframe(frame))
 
-    def receive(self):
+    def receive(self) -> WebsocketFrame:
         '''
             Receives a single frame immediately
         '''
@@ -106,10 +117,11 @@ class Websocket(Adapter):
         inputs,outputs,error = select.select([self.request.request], [self.request.request], [],1.0)
         if inputs:
             # target socket is ready to send,process frame,then callback
-            if (frame:= self.receive()):
-                if frame[4] == WebsocketOpCode.CLOSE_CONN:
+            frame = self.receive()
+            if frame:
+                if frame.OPCODE == Websocket.CLOSE_CONN:
                     # client requested to close connection
-                    self.send_nowait(b'', OPCODE=WebsocketOpCode.CLOSE_CONN)
+                    self.send_nowait(WebsocketFrame(OPCODE=Websocket.CLOSE_CONN))
                     # accepts such request
                     raise Exception('Client requested to close Websocket connection')
                 self.callback(frame)
@@ -130,7 +142,7 @@ class Websocket(Adapter):
             try:
                 self.handle_once()
                 if ping_interval and time.time() - tick_ping >= ping_interval:
-                    self.send(b'',OPCODE=WebsocketOpCode.PING)
+                    self.send(WebsocketFrame(OPCODE=Websocket.PING))
                     tick_ping = time.time()
                 time.sleep(0.001)
                 # This hack was added to avoid high CPU cost...*sigh*
@@ -138,23 +150,23 @@ class Websocket(Adapter):
                 # Quit once any exception occured
                 self.request.log_error(str(e))
                 self.keep_alive = False
-        self.request.log_request('Websocket Connection closed')
+        self.request.log_debug('Websocket Connection closed')
         self.is_shutdown = True
 
-    def send_nowait(self, PAYLOAD, FIN=1, OPCODE=WebsocketOpCode.TEXT, MASK=0):
+    def send_nowait(self, frame:WebsocketFrame):
         '''
             Sends a constructed message immediately
         '''
-        self.request.wfile.write(self.__websocket_constructframe(PAYLOAD, FIN, OPCODE, MASK))
+        self.request.wfile.write(self.__websocket_constructframe(frame))
         self.request.wfile.flush()
     
     def shutdown(self):
         '''Sets kill switch,and wait for the loop to end'''
-        self.send_nowait(b'', OPCODE=WebsocketOpCode.CLOSE_CONN)
+        self.send_nowait(WebsocketFrame(OPCODE=Websocket.CLOSE_CONN))
         self.keep_alive = False
         while not self.is_shutdown:pass
 
-    def __websocket_constructframe(self, data: bytearray, FIN=1, OPCODE=WebsocketOpCode.TEXT, MASK=0):
+    def __websocket_constructframe(self, data: WebsocketFrame) -> bytearray:
         '''
         Constructing frame
 
@@ -179,35 +191,38 @@ class Websocket(Adapter):
             |                     Payload Data continued ...                |
             +---------------------------------------------------------------+
         '''
-        (header:= bytearray()).append(self.__construct_byte([FIN, 0, 0, 0] + self.__extract_byte(OPCODE)[4:]))
+        binary = bytearray()
+        if not isinstance(data,WebsocketFrame):data=WebsocketFrame(PAYLOAD=data)
+        binary.append(self.__construct_byte([data.FIN, data.RSV1,data.RSV2,data.RSV3] + self.__extract_byte(data.OPCODE)[4:]))
         # 1st byte:FIN,RSV1,RSV2,RSV3,OPCODE
-        PAYLOAD_LENGTH = len(data)
+        PAYLOAD_LENGTH = len(data.PAYLOAD) if not data.PAYLOAD_LENGTH else data.PAYLOAD_LENGTH
         if PAYLOAD_LENGTH >= 126 and PAYLOAD_LENGTH < 65536:
-            header.append(self.__construct_byte(
-                [MASK] + self.__extract_byte(126)[1:]))
+            binary.append(self.__construct_byte(
+                [data.MASK] + self.__extract_byte(126)[1:]))
             '''
             If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length.
             '''
-            header.extend(struct.pack('>H', PAYLOAD_LENGTH))
+            binary.extend(struct.pack('>H', PAYLOAD_LENGTH))
         elif PAYLOAD_LENGTH >= 65536 and PAYLOAD_LENGTH < 2**64:
-            header.append(self.__construct_byte(
-                [MASK] + self.__extract_byte(127)[1:]))
+            binary.append(self.__construct_byte(
+                [data.MASK] + self.__extract_byte(127)[1:]))
             '''
             If 127, the following 8 bytes interpreted as a 64-bit unsigned integer
             '''
-            header.extend(struct.pack('>Q', PAYLOAD_LENGTH))
+            binary.extend(struct.pack('>Q', PAYLOAD_LENGTH))
         else:
-            header.append(self.__construct_byte(
-                [MASK] + self.__extract_byte(PAYLOAD_LENGTH)[1:]))
-        if MASK:
+            binary.append(self.__construct_byte(
+                [data.MASK] + self.__extract_byte(PAYLOAD_LENGTH)[1:]))
+        if data.MASK:
             # Reserved:A server must not mask any frames that it sends to the client
             mkey = self.__gen_maskey()
-            data = self.__mask(data, mkey)
-            header.extend(mkey)
-        header.extend(data)
-        return header
+            data.PAYLOAD = self.__mask(data.PAYLOAD, mkey)
+            binary.extend(mkey)
+        # 2nd+ bytes: PAYLOAD_LENGTH,MASK,MASKEY
+        binary.extend(data.PAYLOAD)
+        return binary
 
-    def __websocket_recieveframe(self, rfile: typing.BinaryIO = None):
+    def __websocket_recieveframe(self, rfile: typing.BinaryIO) -> WebsocketFrame:
         '''
         Receiving frame,PAYLOAD is unmasked
 
@@ -232,8 +247,6 @@ class Websocket(Adapter):
             |                     Payload Data continued ...                |
             +---------------------------------------------------------------+
         '''
-        if not rfile:
-            rfile = self.request.rfile
         b1, b2 = rfile.read(2)
         FIN, RSV1, RSV2, RSV3 = self.__extract_byte(b1)[:4]
         OPCODE = self.__construct_byte(self.__extract_byte(b1)[4:])
@@ -253,7 +266,7 @@ class Websocket(Adapter):
         MASKEY = rfile.read(4)
         PAYLOAD = rfile.read(PAYLOAD_LENGTH)
         PAYLOAD = self.__mask(PAYLOAD, MASKEY)
-        return (FIN, RSV1, RSV2, RSV3, OPCODE, MASK, PAYLOAD_LENGTH, MASKEY, PAYLOAD)
+        return WebsocketFrame(FIN, RSV1, RSV2, RSV3, OPCODE, MASK, PAYLOAD_LENGTH, MASKEY, PAYLOAD)
 
     def __gen_maskey(self):
         '''

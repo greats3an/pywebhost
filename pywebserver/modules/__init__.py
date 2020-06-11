@@ -53,19 +53,19 @@ class HTTPModules():
         '''Sends a string to the client,DOES NOT flush headers nor send response code'''
         return request.wfile.write(string.encode(encoding) if type(string) != bytes else string)
     @staticmethod
-    def WriteFileHTTP(request:RequestHandler,file,chunck=4 * 8192,support_range=True):
+    def WriteFileHTTP(request:RequestHandler,file,chunck=32768,support_range=True):
         '''Sends a file with path,or sends a ByteIO-like object.will flush the headers,and sends a valid HTTP response code'''
         if isinstance(file,str):
             f,s = open(file,'rb'),os.stat(file).st_size
         else:
             if getattr(file,'read'):
                 f,s = file,0
+            else:raise IOError('File cannot be read')
         # Always add this header first
         # For sending all of the file in chunks
         def send_once():                        
             request.send_response(HTTPStatus.OK)
-            if s:
-                # a `real` file
+            if s:# a `real` file
                 if support_range:request.send_header('Accept-Ranges','bytes')
                 request.send_header('Content-Length',str(s))
                 request.send_header('Content-Type',Utilties.GuessMIME(file))
