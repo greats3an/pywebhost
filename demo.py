@@ -67,32 +67,31 @@ def subfolder(request : RequestHandler):
     # Indexes folders of local path and renders a webpage
     HTTPModules.IndexFolder(request,'./' + request.path[7:],GetStyleSheet())
 
-ws_list = []
+class WSChat(Websocket):
+    # Using classes to do websocket jobs is recommended
+    def callback(self, frame):
+        if not super().callback(frame):return
+        def others():return ",".join([ws_.name if hasattr(ws_,"name") else "[PENDING]" for ws_ in server.websockets if ws_ != self])
+        if not hasattr(self,'name'):
+            # 1st message,aquire username
+            setattr(self,'name', frame.PAYLOAD.decode())
+            self.send(f'<b>Welcome,{self.name}</b>...<i>Other online users:{others()}</i>')
+            return
+        for ws in server.websockets:
+            if self != ws:ws.send(f'{self.name} says: {frame.PAYLOAD.decode()}')
+            # Avoid sending to ourselfS
+        self.send('<i>[your message has been sent to %s other members (%s)]</i>' % (len(server.websockets) - 1,others()))
+
 @server.route(PathMakerModules.Absolute('/ws'))
 def websocket(request : RequestHandler):
     # A simple WebSocket echo server,which will boardcast
     # Message to all connected sessions
-    ws = Websocket(request)
-    ws_list.append(ws)
+    ws = WSChat(request)
     # Store the session
     ws.handshake()
-    ws.send_nowait('<b>Name yourself:</b>')
-    def others():return ",".join([ws_.name if hasattr(ws_,"name") else "[PENDING]" for ws_ in ws_list if ws_ != ws])
-    def callback(msg:WebsocketFrame):   
-        if msg.OPCODE == Websocket.PONG:return
-        if not hasattr(ws,'name'):
-            # 1st message,aquire username
-            setattr(ws,'name', msg.PAYLOAD.decode())
-            ws.send(f'<b>Welcome,{ws.name}</b>...<i>Other online users:{others()}</i>')
-            return
-        for ws_ in ws_list:
-            if ws != ws_:ws_.send(f'{ws.name} says: {msg[-1].decode()}')
-            # Avoid sending to ourselfS
-        ws.send('<i>[your message has been sent to %s other members (%s)]</i>' % (len(ws_list) - 1,others()))
-    ws.callback = callback
+    ws.send('<b>Name yourself:</b>')
     ws.serve()
-    ws_list.remove(ws)
-    # Removes session after it closes
+    # Starts serving until exceptions
 
 
 @server.route(PathMakerModules.Absolute('/'))
