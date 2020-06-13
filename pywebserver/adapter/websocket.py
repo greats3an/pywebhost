@@ -217,14 +217,14 @@ class Websocket(Adapter):
         '''
         if frame.OPCODE == Websocket.PING:
             # ping -> pong -> end
-            self.send_nowait(WebsocketFrame(OPCODE=Websocket.PONG))
+            self.send(WebsocketFrame(OPCODE=Websocket.PONG))
             return False
         if frame.OPCODE == Websocket.PONG:
             # pong -> ignore -> end
             return False
         elif frame.OPCODE == Websocket.CLOSE_CONN:
             # client requested to close connection -> end
-            self.send_nowait(WebsocketFrame(OPCODE=Websocket.CLOSE_CONN))
+            self.send(WebsocketFrame(OPCODE=Websocket.CLOSE_CONN))
             # accepts such request,raises an exception
             raise WebsocketConnectionClosedException(True)
         return True
