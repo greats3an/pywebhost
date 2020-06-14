@@ -8,28 +8,33 @@ from . import Adapter,AdapterConfidence
 from http import HTTPStatus
 from enum import IntEnum
 
-def WSProperty(func):
-    @property
-    def wrapper(self):
-        return getattr(self,'_' + func.__name__)
-    @wrapper.setter
-    def wrapper(self,value):
-        return setattr(self,'_' + func.__name__,value)
-    return wrapper
+
 
 class WebsocketConnectionClosedException(Exception):
     def __init__(self,is_requested : bool):
         self.is_requested = is_requested
         super().__init__(f'Client {"requested" if is_requested else "UNEXPECTLY"} closed connection')
 
+def WSProperty(func):
+    '''Wrapper for `WebsocketFrame`'''
+    @property
+    def wrapper(self):
+        return getattr(self,'_' + func.__name__)
+    @wrapper.setter
+    def wrapper(self,value):
+        return setattr(self,'_' + func.__name__,value)
+    return wrapper  
+
 class WebsocketFrame():
     '''Provides docstrings and converters for Websocket Frame bits'''
     encoding = 'utf-8'
     @staticmethod
-    def bytes(d):
+    def bytes(d) -> bytearray:
+        '''Converts any datatype to a mutable bytearray'''
         if isinstance(d,str):return d.encode(encoding=WebsocketFrame.encoding)
         if isinstance(d,bytearray) or isinstance(d,bytes): return d
         return WebsocketFrame.bytes(json.dumps(d))
+
     def __init__(self,FIN=1,RSV1=0,RSV2=0,RSV3=0,OPCODE=1,MASK=0,PAYLOAD_LENGTH=0,MASKEY=0,PAYLOAD=b''):
         self._FIN,self._RSV1,self._RSV2,self._RSV3,self._OPCODE,self._MASK,self._PAYLOAD_LENGTH,self._MASKEY,self._PAYLOAD = FIN,RSV1,RSV2,RSV3,OPCODE,MASK,PAYLOAD_LENGTH,MASKEY,self.bytes(PAYLOAD)
         super().__init__()
@@ -154,14 +159,18 @@ class Websocket(Adapter):
         - callback        :       callback for received frame
             - Called once the packet is received
         - shutdown
-            - This will set the kill switch,and wait for the session to actually end
+            - This will set the kill switch
 
         eg:
 
-            request = Websocket(request)
-            request.handshake()
-            request.callback = recv_callback
-            request.serve()
+            class WebsocketApp(Websocket):
+                def callback(self,frame : WebsocketFrame):
+                    print('Message:',frame.PAYLOAD)
+            @server.rotue(PathMakerModlues.Absoulte('/'))
+            def websocket(request):
+                ws = WebsocketApp(request)
+                ws.handshake()
+                ws.serve()
             ...
     '''
     # Websocket OpCodes
@@ -206,9 +215,9 @@ class Websocket(Adapter):
         '''
             Callback funtionality.By default,it responses to PINGs,and CLOSE-connection requests
 
-            And returns False if this frame should not be processed anymore,vise-versa
+            And returns False if this frame should not be processed anymore (e.g. recevied `PING` `PONG` `CLOSE_CONN`,etc),vise-versa
 
-            `super()` this function *FIRST* when overriding it
+            `super()` this function *FIRST*
 
             e.g
 
@@ -231,7 +240,7 @@ class Websocket(Adapter):
 
     def send(self,frame:WebsocketFrame):
         '''
-            Appends message to the buffer
+            Appends message to the buffer,Every message will be constructed as a Websocket Frame
         '''
         return self.request.wfile.write(self.__websocket_constructframe(frame))
 
@@ -245,7 +254,8 @@ class Websocket(Adapter):
         '''
             Starts processing I/O,and blocks until connection is closed or flag is set
 
-                ping_interval   :   WS `Ping` heartbeat interval,set `0` to disable it
+                
+            `ping_interval`   :   WS `Ping` heartbeat interval,set `0` to disable it
         '''
         if not self.did_handshake:
             raise Exception("Websocket did not perform handshake!")

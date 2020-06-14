@@ -10,50 +10,51 @@ server = PyWebServer(('',3310))
 # Initializes the server without binding it
 
 def GetStyleSheet():return '''
-* {
-    font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
-    font-size: 16px;
-}
+    * {
+        font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+        font-size: 16px;
+    }
 
-body {
-    margin: 1em;
-    background-color: #2d2d2d;
-}
+    body {
+        margin: 1em;
+        background-color: #2d2d2d;
+    }
 
-a,center,span {
-    color: #CCC;
-    text-decoration: none;
-    transition: all 0.1s linear;
-}
+    a,center,span {
+        color: #CCC;
+        text-decoration: none;
+        transition: all 0.1s linear;
+    }
 
-p {
-    color: #999;
-}
+    p {
+        color: #999;
+    }
 
-a:hover,span:hover {
-    color: #ffcc66;
-}
+    a:hover,span:hover {
+        color: #ffcc66;
+    }
 
-h1 {
-    color: #CCC;
-    font-size: 32px;
-}
+    h1 {
+        color: #CCC;
+        font-size: 32px;
+    }
 
-h3 {
-    color: #AAA;
-    font-size: 24px;
-}
+    h3 {
+        color: #AAA;
+        font-size: 24px;
+    }
 
-h4 {
-    color: #CCC;
-    font-size: 18px;
-}
+    h4 {
+        color: #CCC;
+        font-size: 18px;
+    }
 
-pre {
-    overflow: auto;
-    margin: 1em;
-    line-height: 2em;
-}'''
+    pre {
+        overflow: auto;
+        margin: 1em;
+        line-height: 2em;
+    }
+'''
 # Stylesheet!
 
 @server.route(PathMakerModules.Absolute('/files'))
@@ -67,19 +68,30 @@ def subfolder(request : RequestHandler):
     # Indexes folders of local path and renders a webpage
     HTTPModules.IndexFolder(request,'./' + request.path[7:],GetStyleSheet())
 
+messages = '<i>Server started at %s</i>' % RequestHandler.time_string(None)
 class WSChat(Websocket):
     # Using classes to do websocket jobs is recommended
+    def boardcast(self,message):
+        global messages
+        messages += f'<p>{message}<p>'
+        for ws in server.websockets:
+            if self != ws:ws.send(message)
+
     def callback(self, frame):
+        global messages
         if not super().callback(frame):return
         def others():return ",".join([ws_.name if hasattr(ws_,"name") else "[PENDING]" for ws_ in server.websockets if ws_ != self])
         if not hasattr(self,'name'):
             # 1st message,aquire username
             setattr(self,'name', frame.PAYLOAD.decode())
+            self.boardcast(f'<i>{self.name} Logged in</i>')
             self.send(f'<b>Welcome,{self.name}</b>...<i>Other online users:{others()}</i>')
+            self.send('<b>Message Histroy</b><hr>')
+            self.send(messages)
+            self.send('<hr>')
             return
-        for ws in server.websockets:
-            if self != ws:ws.send(f'{self.name} says: {frame.PAYLOAD.decode()}')
-            # Avoid sending to ourselfS
+        message = f'{self.name} says: {frame.PAYLOAD.decode()}'
+        self.boardcast(message)
         self.send('<i>[your message has been sent to %s other members (%s)]</i>' % (len(server.websockets) - 1,others()))
 
 @server.route(PathMakerModules.Absolute('/ws'))
