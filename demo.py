@@ -30,6 +30,10 @@ def GetStyleSheet():return '''
         color: #999;
     }
 
+    i {
+        color:#CCC;
+    }
+
     a:hover,span:hover {
         color: #ffcc66;
     }
