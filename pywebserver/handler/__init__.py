@@ -5,12 +5,19 @@ from http import HTTPStatus, server , client
 from html import escape
 from urllib.parse import urlparse,parse_qs,unquote
 from io import BufferedIOBase
-
 '''
 Essentially static class variables
 '''
 
-
+def Property(func):
+    '''Wrapper for static properties for `Handler`'''
+    @property
+    def wrapper(self):
+        return getattr(self,'_' + func.__name__)
+    @wrapper.setter
+    def wrapper(self,value):
+        return setattr(self,'_' + func.__name__,value)
+    return wrapper
 
 # The default request version.  This only affects responses up until
 # the point where the request line is parsed, so it mainly decides what
@@ -366,26 +373,30 @@ class RequestHandler(StreamRequestHandler):
     Properties.These funtions do nothing but providing documents
     and will be overriden
     """
-    @property
-    def wfile(self) -> BufferedIOBase:return self._wfile
-    @wfile.setter
-    def wfile(self,v):
+    @Property
+    def wfile(self) -> BufferedIOBase:
         '''`BufferedIOBase` like I/O for writing messages to sockets'''
-        self._wfile = v
+        pass
 
-    @property
-    def rfile(self) -> BufferedIOBase:return self._rfile
-    @rfile.setter
-    def rfile(self,v):
+    @Property
+    def rfile(self) -> BufferedIOBase:
         '''`BufferedIOBase` like I/O for reading messages from sockets'''
-        self._rfile = v
+        pass
 
-    @property
-    def headers(self) -> client.HTTPMessage:return self._headers
-    @headers.setter
-    def headers(self,v):
+    @Property
+    def headers(self) -> client.HTTPMessage:
         '''Contains parsed headers'''
-        self._headers = v
+        pass
+
+    @Property
+    def command(self) -> str:
+        '''The request command (GET,POST,etc)'''
+        pass
+
+    @Property
+    def raw_requestline(self) -> str:
+        '''Raw `HTTP` request line of the request'''
+        pass
 
 import os
 __all__ = [i[:-3] for i in os.listdir(os.path.dirname(__file__)) if i[-2:] == 'py' and i != '__init__.py']

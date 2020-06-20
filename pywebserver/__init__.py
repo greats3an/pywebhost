@@ -3,6 +3,16 @@ from .handler import RequestHandler
 from .modules import PathMakerModules,UnfinishedException
 from http import HTTPStatus
 
+def Property(func):
+    '''Wrapper for static properties for `PyWebServer`'''
+    @property
+    def wrapper(self):
+        return getattr(self,'_' + func.__name__)
+    @wrapper.setter
+    def wrapper(self,value):
+        return setattr(self,'_' + func.__name__,value)
+    return wrapper
+
 class PathMaker(dict):
     '''For storing and handling path mapping
     

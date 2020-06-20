@@ -1,6 +1,17 @@
 from ..handler import RequestHandler
 from http import HTTPStatus
 import os,mimetypes
+
+def Property(func):
+    '''Wrapper for static properties for `Modlues`'''
+    @property
+    def wrapper(self):
+        return getattr(self,'_' + func.__name__)
+    @wrapper.setter
+    def wrapper(self,value):
+        return setattr(self,'_' + func.__name__,value)
+    return wrapper
+
 class Utilties():
     @staticmethod
     def GuessMIME(path):

@@ -4,26 +4,16 @@
 Offers simple ways of dealing with WS connections
 '''
 import logging,time,struct,random,base64,hashlib,typing,select,json
-from . import Adapter,AdapterConfidence
+from . import Adapter,AdapterConfidence,Property
 from http import HTTPStatus
 from enum import IntEnum
-
-
 
 class WebsocketConnectionClosedException(Exception):
     def __init__(self,is_requested : bool):
         self.is_requested = is_requested
         super().__init__(f'Client {"requested" if is_requested else "UNEXPECTLY"} closed connection')
 
-def WSProperty(func):
-    '''Wrapper for `WebsocketFrame`'''
-    @property
-    def wrapper(self):
-        return getattr(self,'_' + func.__name__)
-    @wrapper.setter
-    def wrapper(self,value):
-        return setattr(self,'_' + func.__name__,value)
-    return wrapper  
+
 
 class WebsocketFrame():
     '''Provides docstrings and converters for Websocket Frame bits'''
@@ -38,14 +28,14 @@ class WebsocketFrame():
     def __init__(self,FIN=1,RSV1=0,RSV2=0,RSV3=0,OPCODE=1,MASK=0,PAYLOAD_LENGTH=0,MASKEY=0,PAYLOAD=b''):
         self._FIN,self._RSV1,self._RSV2,self._RSV3,self._OPCODE,self._MASK,self._PAYLOAD_LENGTH,self._MASKEY,self._PAYLOAD = FIN,RSV1,RSV2,RSV3,OPCODE,MASK,PAYLOAD_LENGTH,MASKEY,self.bytes(PAYLOAD)
         super().__init__()
-    @WSProperty
+    @Property
     def FIN(self):
         '''     FIN:  1 bit
 
       Indicates that this is the final fragment in a message.  The first
       fragment MAY also be the final fragment.'''
         pass
-    @WSProperty
+    @Property
     def RSV1(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
 
@@ -55,7 +45,7 @@ class WebsocketFrame():
       value, the receiving endpoint MUST _Fail the WebSocket
       Connection_.'''
         pass
-    @WSProperty
+    @Property
     def RSV2(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
 
@@ -65,7 +55,7 @@ class WebsocketFrame():
       value, the receiving endpoint MUST _Fail the WebSocket
       Connection_.'''
         pass
-    @WSProperty
+    @Property
     def RSV3(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
 
@@ -75,7 +65,7 @@ class WebsocketFrame():
       value, the receiving endpoint MUST _Fail the WebSocket
       Connection_.'''
         pass
-    @WSProperty
+    @Property
     def OPCODE(self):
         '''Opcode:  4 bits
 
@@ -100,7 +90,7 @@ class WebsocketFrame():
 
       -  %xB-F are reserved for further control frames'''
         pass
-    @WSProperty
+    @Property
     def MASK(self):
         ''' Mask:  1 bit
 
@@ -109,7 +99,7 @@ class WebsocketFrame():
       the "Payload data" as per Section 5.3.  All frames sent from
       client to server have this bit set to 1.'''
         pass
-    @WSProperty
+    @Property
     def PAYLOAD_LENGTH(self):
         '''   Payload length:  7 bits, 7+16 bits, or 7+64 bits
 
@@ -127,7 +117,7 @@ class WebsocketFrame():
       zero, in which case the payload length is the length of the
       "Application data".'''
         pass
-    @WSProperty
+    @Property
     def MASKEY(self):
         '''  Masking-key:  0 or 4 bytes
 
@@ -137,7 +127,7 @@ class WebsocketFrame():
       is set to 0.  See Section 5.3 for further information on client-
       to-server masking.'''
         pass
-    @WSProperty
+    @Property
     def PAYLOAD(self):
         ''' Payload data:  (x+y) bytes
 
