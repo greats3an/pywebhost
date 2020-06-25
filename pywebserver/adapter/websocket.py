@@ -13,8 +13,6 @@ class WebsocketConnectionClosedException(Exception):
         self.is_requested = is_requested
         super().__init__(f'Client {"requested" if is_requested else "UNEXPECTLY"} closed connection')
 
-
-
 class WebsocketFrame():
     '''Provides docstrings and converters for Websocket Frame bits'''
     encoding = 'utf-8'
