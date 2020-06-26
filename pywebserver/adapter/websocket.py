@@ -204,7 +204,7 @@ class Websocket(Adapter):
         self.request.end_headers()
         self.did_handshake = True
         self.request.log_request('New Websocket session from %s:%s' % self.request.client_address)   
-        self.onCreate()
+        self.onOpen()
 
     def onReceive(self, frame:WebsocketFrame):
         '''Decides what to do once a frame has been recevied'''
