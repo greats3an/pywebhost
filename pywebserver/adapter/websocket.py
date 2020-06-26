@@ -201,19 +201,14 @@ class Websocket(Adapter):
         self.request.end_headers()
         self.did_handshake = True
         self.request.log_request('New Websocket session from %s:%s' % self.request.client_address)   
-
+    
     def onReceive(self, frame:WebsocketFrame):
-        '''
-            Callback funtionality.By default,it responses to PINGs,and CLOSE-connection requests
-
-            And returns False if this frame should not be processed anymore (e.g. recevied `PING` `PONG` `CLOSE_CONN`,etc),vise-versa
-
-            `super()` this function *FIRST*
-
-            e.g
-
-                if super().callback(frame):
-                    ...
+        '''Decides what to do once a frame has been recevied'''
+        pass
+    
+    def _onReceive(self, frame:WebsocketFrame):
+        '''Base recevie method,deals with interal websocket codes and such
+        DO NOT OVERRIDE unless you know what you're doing
         '''
         if frame.OPCODE == Websocket.PING:
             # ping -> pong -> end
@@ -227,7 +222,8 @@ class Websocket(Adapter):
             self.send(WebsocketFrame(OPCODE=Websocket.CLOSE_CONN))
             # accepts such request,raises an exception
             raise WebsocketConnectionClosedException(True)
-        return True
+        # All checks passed,proceed to perfrom the callback
+        self.onReceive(frame)
 
     def send(self,frame:WebsocketFrame):
         '''
@@ -259,7 +255,7 @@ class Websocket(Adapter):
                 readable = select.select([self.request.request],[],[],1.0)[0]     
                 if readable:
                     frame = self.receive()
-                    self.onReceive(frame)
+                    self._onReceive(frame)
                 self.sched()
                 # Checks & runs periodic tasks
                 time.sleep(0.01)
@@ -282,6 +278,7 @@ class Websocket(Adapter):
         self.request.log_debug('Websocket Connection closed')
         self.request.server.websockets.remove(self)
         # kicks ourself out
+
     def __websocket_constructframe(self, data: WebsocketFrame) -> bytearray:
         '''
         Constructing frame

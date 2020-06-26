@@ -83,7 +83,6 @@ class WSChat(Websocket):
 
     def onReceive(self, frame):
         global messages
-        if not super().onReceive(frame):return
         def others():return ",".join([ws_.name if hasattr(ws_,"name") else "[PENDING]" for ws_ in server.websockets if ws_ != self])
         if not hasattr(self,'name'):
             # 1st message,aquire username
