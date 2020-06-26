@@ -87,7 +87,7 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
                 excepted_excptions += 1
             except Exception as e:
                 # For Other server-side exceptions,let the client know
-                return request.send_error(HTTPStatus.SERVICE_UNAVAILABLE,explain=e)
+                return request.send_error(HTTPStatus.SERVICE_UNAVAILABLE,explain=str(e))
         # Request's not handled,and no UnfinishedException is ever called:No URI matched
         if not excepted_excptions:return request.send_error(HTTPStatus.NOT_FOUND)
         # No fatal exceptions,assume the response is unfinished
