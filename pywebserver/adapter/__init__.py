@@ -115,7 +115,7 @@ class Adapter():
         # Stores the request
         if not ignore_confidence and self.__confidence__(request) < 0.3:
             '''Raise an exception if the confidence is too low'''
-            raise Exception("Confidence for '%s' is too low (%s)" % (self.__name__,self.__confidence__(request)))
+            raise Exception("Confidence for '%s' is too low (%s)" % (type(self).__name__,self.__confidence__(request)))
         return
 
     def send(self,message):
