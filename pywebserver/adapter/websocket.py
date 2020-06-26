@@ -4,10 +4,10 @@
 Offers simple ways of dealing with WS connections
 '''
 import logging,time,struct,random,base64,hashlib,typing,select,json
-from . import Adapter,AdapterConfidence,Property
+from . import Adapter,AdapterConfidence,Property,BaseScheduler
 from http import HTTPStatus
 from enum import IntEnum
-
+from datetime import timedelta
 class WebsocketConnectionClosedException(Exception):
     def __init__(self,is_requested : bool):
         self.is_requested = is_requested
@@ -133,7 +133,6 @@ class WebsocketFrame():
       with "Application data".'''
         pass
     
-    
 class Websocket(Adapter):
     '''
         # Websocket Adapter
@@ -160,6 +159,9 @@ class Websocket(Adapter):
                 ws.handshake()
                 ws.serve()
             ...
+
+        The requests,once being adapted into `Websocket` objects,will be added to the `server`'s 
+        `websockets` list as a `Adapter` object
     '''
     # Websocket OpCodes
     CONTINUATION = 0x0
@@ -183,8 +185,9 @@ class Websocket(Adapter):
            Use `ignore_confidence=True` to bypass `confidence` checking
         ''' 
         super().__init__(request,*a,**k) 
-        self.keep_alive,self.did_handshake = True,False
+        self.keep_alive,self.did_handshake,self.sched = True,False,BaseScheduler()
         # Adds ourself into the server list
+        # If the list is not present in the server,create it otherwise
         if not hasattr(self.request.server,'websockets'):setattr(self.request.server,'websockets',[])
         self.request.server.websockets.append(self)
         
@@ -199,7 +202,7 @@ class Websocket(Adapter):
         self.did_handshake = True
         self.request.log_request('New Websocket session from %s:%s' % self.request.client_address)   
 
-    def callback(self, frame:WebsocketFrame):
+    def onReceive(self, frame:WebsocketFrame):
         '''
             Callback funtionality.By default,it responses to PINGs,and CLOSE-connection requests
 
@@ -243,28 +246,28 @@ class Websocket(Adapter):
             Starts processing I/O,and blocks until connection is closed or flag is set
 
                 
-            `ping_interval`   :   WS `Ping` heartbeat interval,set `0` to disable it
+            `ping_interval`   :   WS `Ping` heartbeat interval in seconds,set `0` to disable it
         '''
         if not self.did_handshake:
-            raise Exception("Websocket did not perform handshake!")
-        tick_ping = 0
+            raise Exception("Handshake was not performed!")
+        # Setup periodic tasks
+        @self.sched.new(delta=timedelta(seconds=ping_interval))
+        def ping():self.send(WebsocketFrame(OPCODE=Websocket.PING))
+        # PING the client websocket every given seconds
         while self.keep_alive:
             try:
                 readable = select.select([self.request.request],[],[],1.0)[0]     
                 if readable:
                     frame = self.receive()
-                    self.callback(frame)
-                if ping_interval and time.time() - tick_ping >= ping_interval:
-                    self.send(WebsocketFrame(OPCODE=Websocket.PING))
-                    tick_ping = time.time()
+                    self.onReceive(frame)
+                self.sched()
+                # Checks & runs periodic tasks
                 time.sleep(0.01)
             except Exception as e:
                 # Quit once any exception occured
                 self.request.log_error(str(e))
                 self.keep_alive = False
-        self.request.log_debug('Websocket Connection closed')
-        self.request.server.websockets.remove(self)
-        # kicks ourself out
+        self.onClose()
 
     def close(self):
         '''Tries to close the connection via sending CLOSE_CONN Opcode'''
@@ -272,8 +275,13 @@ class Websocket(Adapter):
 
     def close_forced(self):
         '''Forcily closes the connection by killing the `serve` thread'''
-        self.keep_alive = False
+        self.keep_alive = False    
 
+    def onClose(self):
+        '''Decides what to do once the connection is closed,either by the server or the client'''
+        self.request.log_debug('Websocket Connection closed')
+        self.request.server.websockets.remove(self)
+        # kicks ourself out
     def __websocket_constructframe(self, data: WebsocketFrame) -> bytearray:
         '''
         Constructing frame
