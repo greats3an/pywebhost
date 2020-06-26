@@ -191,6 +191,9 @@ class Websocket(Adapter):
         if not hasattr(self.request.server,'websockets'):setattr(self.request.server,'websockets',[])
         self.request.server.websockets.append(self)
         
+    def onOpen(self):
+        '''Decides what to do once the handshake was perfromed'''
+        pass
 
     def handshake(self):
         '''Do Websocket handshake,must be done first after the request is parsed'''
@@ -201,7 +204,8 @@ class Websocket(Adapter):
         self.request.end_headers()
         self.did_handshake = True
         self.request.log_request('New Websocket session from %s:%s' % self.request.client_address)   
-    
+        self.onCreate()
+
     def onReceive(self, frame:WebsocketFrame):
         '''Decides what to do once a frame has been recevied'''
         pass
