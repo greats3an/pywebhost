@@ -25,6 +25,8 @@ class WebsocketFrame():
 
     def __init__(self,FIN=1,RSV1=0,RSV2=0,RSV3=0,OPCODE=1,MASK=0,PAYLOAD_LENGTH=0,MASKEY=0,PAYLOAD=b''):
         self._FIN,self._RSV1,self._RSV2,self._RSV3,self._OPCODE,self._MASK,self._PAYLOAD_LENGTH,self._MASKEY,self._PAYLOAD = FIN,RSV1,RSV2,RSV3,OPCODE,MASK,PAYLOAD_LENGTH,MASKEY,self.bytes(PAYLOAD)
+        if not self._PAYLOAD_LENGTH:self._PAYLOAD_LENGTH = len(self._PAYLOAD)
+        # Re-applie payload length if not given
         super().__init__()
     @Property
     def FIN(self):
@@ -312,24 +314,28 @@ class Websocket(Adapter):
         if not isinstance(data,WebsocketFrame):data=WebsocketFrame(PAYLOAD=data)
         binary.append(self.__construct_byte([data.FIN, data.RSV1,data.RSV2,data.RSV3] + self.__extract_byte(data.OPCODE)[4:]))
         # 1st byte:FIN,RSV1,RSV2,RSV3,OPCODE
-        PAYLOAD_LENGTH = len(data.PAYLOAD) if not data.PAYLOAD_LENGTH else data.PAYLOAD_LENGTH
-        if PAYLOAD_LENGTH >= 126 and PAYLOAD_LENGTH < 65536:
+        if data.PAYLOAD_LENGTH >= 126 and data.PAYLOAD_LENGTH < 65536:
             binary.append(self.__construct_byte(
                 [data.MASK] + self.__extract_byte(126)[1:]))
             '''
             If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length.
             '''
-            binary.extend(struct.pack('>H', PAYLOAD_LENGTH))
-        elif PAYLOAD_LENGTH >= 65536 and PAYLOAD_LENGTH < 2--64:
+            binary.extend(struct.pack('>H', data.PAYLOAD_LENGTH))
+        elif data.PAYLOAD_LENGTH >= 65536 and data.PAYLOAD_LENGTH < 2**64:
             binary.append(self.__construct_byte(
                 [data.MASK] + self.__extract_byte(127)[1:]))
             '''
             If 127, the following 8 bytes interpreted as a 64-bit unsigned integer
             '''
-            binary.extend(struct.pack('>Q', PAYLOAD_LENGTH))
-        else:
+            binary.extend(struct.pack('>Q', data.PAYLOAD_LENGTH))
+        elif data.PAYLOAD_LENGTH >= 0 and data.PAYLOAD_LENGTH < 126:
+            '''
+            Otherwise,the following 7 bytes (after MASK) are interpeted as a 7 bit integer
+            '''
             binary.append(self.__construct_byte(
-                [data.MASK] + self.__extract_byte(PAYLOAD_LENGTH)[1:]))
+                [data.MASK] + self.__extract_byte(data.PAYLOAD_LENGTH)[1:]))
+        else:
+            raise Exception("Bad payload length!")
         if data.MASK:
             # Reserved:A server must not mask any frames that it sends to the client
             mkey = self.__gen_maskey()
