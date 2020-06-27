@@ -303,7 +303,7 @@ class RequestHandler(StreamRequestHandler):
         """
         if isinstance(code, HTTPStatus):
             code = code.value
-        self.log_debug('"%s" %s %s',self.requestline, str(code), self.useragent_string())
+        self.log_debug('"%s" %s',self.requestline, str(code))
 
     def address_string(self):
         """Return the client address."""
@@ -326,10 +326,10 @@ class RequestHandler(StreamRequestHandler):
         This method CAN be overwritten.This tries to mimic the
         NGINX Style logging,which looks like this:
 
-            {Client Address} [{Time}] "{Verb} {Path} {HTTP Version}" {Message}
+            {Client Address} [{Time}] "{Verb} {Path} {HTTP Version}" {Message} {User-Agent}
         """
         try:
-            return f'{self.address_string()} [{self.time_string()}]' + f'"{self.command} {self.path} {self.base_version_number}" {format % args}'
+            return f'{self.address_string()} [{self.time_string()}]' + f'"{self.command} {self.path} {self.base_version_number}" {format % args} {self.useragent_string()}'
         except Exception:
             # If an exception ouccred,fallback to another format            
             return f'{self.address_string()} [{self.time_string()}] {format % args}'
