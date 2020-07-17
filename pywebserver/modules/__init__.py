@@ -60,9 +60,9 @@ class HTTPModules():
         request.wfile.flush()
 
     @staticmethod
-    def WriteString(request:RequestHandler,string,encoding='utf-8'):
+    def WriteString(request:RequestHandler,string):
         '''Sends a string to the client,DOES NOT flush headers nor send response code'''
-        return request.wfile.write(string.encode(encoding) if type(string) != bytes else string)
+        return request.wfile.write(str(string).encode() if type(string) != bytes else string)
     @staticmethod
     def WriteFileHTTP(request:RequestHandler,file,chunck=32768,support_range=True):
         '''Sends a file with path,or sends a ByteIO-like object.will flush the headers,and sends a valid HTTP response code'''
@@ -135,24 +135,37 @@ class HTTPModules():
         # Otherwise
         return send_once()
 
+def PathMaker(maker):
+    def wrapper(target):
+        func = maker(target)
+        func.__setattr__('maker',maker)
+        func.__setattr__('target',target)
+        return func
+    return staticmethod(wrapper)
+
 class PathMakerModules():
     '''
     Provides static methods for `PathMaker` to map paths
 
     The methods,takes 1 string argument and returns a `callable`,
     which again,takes 1 string argument then returns a bool value
+
+    The methods are annotated.Two more attributes are added to the returned funtion:
+
+        `maker`     :       The original PathMakerModule('s Module)
+        `target`    :       The Pathmaker target
     '''
-    @staticmethod
+    @PathMaker
     def Absolute(target):
         '''Checks if the path is exact to the target'''
         return lambda path:path == target
 
-    @staticmethod
+    @PathMaker
     def AbsoluteWithoutCaps(target):
         '''Checks if the path is exact to the target without matching captial letters'''
         return lambda path:path.lower() == target.lower()
     
-    @staticmethod
+    @PathMaker
     def DirectoryPath(target):
         '''Checks if the path has the targeted base path,which is useful for non-absolute paths
         e.g.:

@@ -106,26 +106,53 @@ class Adapter():
             confidence += m_confidence(request,weights[m_confidence])
         return confidence
 
-    def __init__(self,request:RequestHandler,ignore_confidence=False):
-        '''Initiaztes the adapter with given request
-        
-           Use `ignore_confidence=True` to bypass `confidence` checking
+    def __init__(self,request:RequestHandler,ignore_confidence=True):
         '''
-        self.request = request
+        Provides basic Adapter model
+
+        Base class proivdes basic HTTP functions,like `send` arbitary data to the client with the correct headers (you may do this by hand otherwise)
+        
+        The `__confidence__` is the base method for checking if a request can be adapted into such Adapter,use it like the example given below:
+        
+            class MyAdapter(Adapter):
+                @staticmethod
+                def __confidence__(request) -> float:        
+                    return super(Websocket,Websocket).__confidence__(request,{
+                        AdapterConfidence.headers:{
+                            'Sec-WebSocket-Key':lambda v:1 if v and len(v) > 8 else 0
+                        },
+                    })
+            ...
+        '''
+        if isinstance(request,Adapter):
+            # For adpating from Adpter to Adapters
+            self.request = Adapter.request
+        else:self.request = request
         # Stores the request
         if not ignore_confidence and self.__confidence__(request) < 0.3:
             '''Raise an exception if the confidence is too low'''
             raise Exception("Confidence for '%s' is too low (%s)" % (type(self).__name__,self.__confidence__(request)))
         return
 
-    def send(self,message):
-        '''I/O Output method,needs to be overriden'''
-        pass
+    def send(self,message,code=200,code_message=''):
+        '''Send a `str` / `bytearray` object to the client and flushes headers
+
+            message     :   the object
+            code        :   HTTP Response code
+            code_message:   Extra Message for this HTTP response
+        '''
+        self.request.send_response(code,code_message)
+        self.request.end_headers()
+        self.request.wfile.write(str(message).encode() if type(message) != bytes else message)
+        self.request.wfile.flush()
 
     def receive(self,message):
-        '''I/O Input method,needs to be overriden'''
+        '''Receive arbitary amount of data from the client,reserved for other adapters'''
         pass
-
+    @Property
+    def request(self) -> RequestHandler:
+        '''`RequestHandler` Object,is overriden once Adpater is initalized'''
+        pass
 class BaseScheduler():
     '''
     Base Synchronus time/tick - based schduler

@@ -1,6 +1,7 @@
 from pywebserver import PyWebServer
 from pywebserver.modules import HTTPModules,PathMakerModules,HTTPStatus
 from pywebserver.handler import RequestHandler
+from pywebserver.adapter import Adapter
 from pywebserver.adapter.websocket import Websocket,WebsocketFrame
 import coloredlogs,io
 coloredlogs.install(level=0)
@@ -108,7 +109,6 @@ def websocket(request : RequestHandler):
     ws.serve()
     # Starts serving until exceptions
 
-
 @server.route(PathMakerModules.Absolute('/'))
 def index(request : RequestHandler):
     # Indexes folders of local path and renders a webpage
@@ -116,6 +116,12 @@ def index(request : RequestHandler):
     request.send_header('Content-Type','text/html; charset=utf-8')
     HTTPModules.WriteFileHTTP(request,ws_html)
 
+@server.route(PathMakerModules.Absolute('/urls'))
+def urls(request:RequestHandler):
+    # Prints out all urls defined in the server
+    html = [i.__getattribute__('target').__name__ for i in server.paths.keys()]
+    request = Adapter(request)
+    request.send(html)
 server.error_message_format = f'<style>{GetStyleSheet()}</style>' + server.error_message_format
 # Adds the style sheet to the error page
 

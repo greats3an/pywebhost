@@ -15,11 +15,10 @@ class WebsocketConnectionClosedException(Exception):
 
 class WebsocketFrame():
     '''Provides docstrings and converters for Websocket Frame bits'''
-    encoding = 'utf-8'
     @staticmethod
     def bytes(d) -> bytearray:
         '''Converts any datatype to a mutable bytearray'''
-        if isinstance(d,str):return d.encode(encoding=WebsocketFrame.encoding)
+        if isinstance(d,str):return d.encode()
         if isinstance(d,bytearray) or isinstance(d,bytes): return d
         return WebsocketFrame.bytes(json.dumps(d))
 
