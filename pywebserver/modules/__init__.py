@@ -155,6 +155,10 @@ class PathMakerModules():
         `maker`     :       The original PathMakerModule('s Module)
         `target`    :       The Pathmaker target
     '''
+    @staticmethod
+    def GetModuleProperty(module):
+        return {'maker':module.__getattribute__('maker'),'target':module.__getattribute__('target')}
+
     @PathMaker
     def Absolute(target):
         '''Checks if the path is exact to the target'''

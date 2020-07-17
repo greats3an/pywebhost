@@ -92,7 +92,7 @@ class AdapterConfidence:
 
 class Adapter():
     @staticmethod
-    def __confidence__(request,weights={}):
+    def __confidence__(request,weights={AdapterConfidence.const:1}):
         '''
             Base `confidence` method,approximates how well will the apdapter fit
             the request
@@ -106,7 +106,7 @@ class Adapter():
             confidence += m_confidence(request,weights[m_confidence])
         return confidence
 
-    def __init__(self,request:RequestHandler,ignore_confidence=True):
+    def __init__(self,request:RequestHandler,ignore_confidence=False):
         '''
         Provides basic Adapter model
 

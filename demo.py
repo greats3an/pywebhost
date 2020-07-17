@@ -119,9 +119,9 @@ def index(request : RequestHandler):
 @server.route(PathMakerModules.Absolute('/urls'))
 def urls(request:RequestHandler):
     # Prints out all urls defined in the server
-    html = [i.__getattribute__('target').__name__ for i in server.paths.keys()]
+    html = [PathMakerModules.GetModuleProperty(i)['target'] for i in server.paths.keys()]
     request = Adapter(request)
-    request.send(html)
+    request.send(f'<style>{GetStyleSheet()}</style>' + '</br>\n'.join([f'<a href="{i}">{i}</a>' for i in html]))
 server.error_message_format = f'<style>{GetStyleSheet()}</style>' + server.error_message_format
 # Adds the style sheet to the error page
 
