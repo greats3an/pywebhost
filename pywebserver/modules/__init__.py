@@ -39,8 +39,8 @@ class HTTPModules():
     @staticmethod
     def IndexFolder(request:RequestHandler,path,stylesheet='',encoding='utf-8'):
         '''Automaticly indexes the folder and renders a human readable HTML page'''
-        if os.path.isfile(path):return HTTPModules.WriteFileHTTP(request,path)
-        # Call `WriteFileHTTP` if we are somehow given a file path
+        if os.path.isfile(path):return HTTPModules.WriteStream(request,path)
+        # Call `WriteStream` if we are somehow given a file path
         request.send_response(HTTPStatus.OK)
         request.send_header('Content-Type','text/html; charset=' + encoding)
         request.end_headers()
@@ -61,25 +61,36 @@ class HTTPModules():
 
     @staticmethod
     def WriteString(request:RequestHandler,string):
-        '''Sends a string to the client,DOES NOT flush headers nor send response code'''
+        '''Appends a string (encoded here) or a bytesarray to the buffer'''
         return request.wfile.write(str(string).encode() if type(string) != bytes else string)
+
     @staticmethod
-    def WriteFileHTTP(request:RequestHandler,file,chunck=32768,support_range=True):
-        '''Sends a file with path,or sends a ByteIO-like object.will flush the headers,and sends a valid HTTP response code'''
-        if isinstance(file,str):
-            f,s = open(file,'rb'),os.stat(file).st_size
+    def WriteStream(request:RequestHandler,stream,chunck=32768,support_range=True):
+        '''Sends a file with path,or sends a ByteIO-like object.will flush the headers,and sends a valid HTTP response code
+                
+        `stream`  :   Either a `str` for filename or a `ByteIO` for streamed IOs
+
+        `chunck`  :   Chunk size in bytes
+
+        `support_range`:  Whether supports HTTP 206s or not
+        '''
+        if isinstance(stream,str):
+            # Try to parse the `file` as a file path
+            if not os.path.exists(stream):
+                return request.send_error(404,explain=f'The reuqested file {stream} is not present on the target server')
+            f,s = open(stream,'rb'),os.stat(stream).st_size
         else:
-            if getattr(file,'read'):
-                f,s = file,0
+            if getattr(stream,'read'):
+                f,s = stream,0
             else:raise IOError('File cannot be read')
         # Always add this header first
         # For sending all of the file in chunks
         def send_once():                        
             request.send_response(HTTPStatus.OK)
-            if s:# a `real` file
+            if s:# a `real` file,which has file size properites
                 if support_range:request.send_header('Accept-Ranges','bytes')
                 request.send_header('Content-Length',str(s))
-                request.send_header('Content-Type',Utilties.GuessMIME(file))
+                request.send_header('Content-Type',Utilties.GuessMIME(stream))
             request.end_headers()            
             chunk = f.read(chunck)
             while chunk:
@@ -112,7 +123,7 @@ class HTTPModules():
             request.send_response(HTTPStatus.PARTIAL_CONTENT)
             request.send_header('Accept-Ranges','bytes')
             request.send_header('Content-Length',str(end - start))
-            request.send_header('Content-Type',Utilties.GuessMIME(file))
+            request.send_header('Content-Type',Utilties.GuessMIME(stream))
             request.send_header('Content-Range','bytes %s-%s/%s' % (start,end,s))
             request.end_headers()            
             try:

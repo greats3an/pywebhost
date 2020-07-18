@@ -114,7 +114,7 @@ def index(request : RequestHandler):
     # Indexes folders of local path and renders a webpage
     ws_html = io.BytesIO((f'<style>{GetStyleSheet()}</style>' + open('demo_ws.html',encoding='utf-8').read()).encode(encoding='utf-8'))
     request.send_header('Content-Type','text/html; charset=utf-8')
-    HTTPModules.WriteFileHTTP(request,ws_html)
+    HTTPModules.WriteStream(request,ws_html)
 
 @server.route(PathMakerModules.Absolute('/urls'))
 def urls(request:RequestHandler):
