@@ -307,7 +307,7 @@ class RequestHandler(StreamRequestHandler):
 
     def address_string(self):
         """Return the client address."""
-        return self.client_address[0] + ':' + self.client_address[1]
+        return self.client_address[0] + ':' + str(self.client_address[1])
 
     def useragent_string(self):
         """Returns the client UA header,if applicable"""
