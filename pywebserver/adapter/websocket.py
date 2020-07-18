@@ -268,7 +268,7 @@ class Websocket(Adapter):
                 # Quit once any exception occured
                 self.request.log_error(str(e))
                 self.keep_alive = False
-        self.onClose()
+        self._onClose()
 
     def close(self):
         '''Tries to close the connection via sending CLOSE_CONN Opcode'''
@@ -278,11 +278,15 @@ class Websocket(Adapter):
         '''Forcily closes the connection by killing the `serve` thread'''
         self.keep_alive = False    
 
-    def onClose(self):
+    def _onClose(self):
         '''Decides what to do once the connection is closed,either by the server or the client'''
         self.request.log_debug('Websocket Connection closed')
         self.request.server.websockets.remove(self)
         # kicks ourself out
+        self.onClose()
+
+    def onClose(self):
+        pass
 
     def __websocket_constructframe(self, data: WebsocketFrame) -> bytearray:
         '''
