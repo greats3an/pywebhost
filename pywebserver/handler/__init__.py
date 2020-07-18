@@ -342,7 +342,7 @@ class RequestHandler(StreamRequestHandler):
 
         Arguments are the same as for log_message().
         """
-        self.logger.error(self.format_log(format,*args))        
+        self.logger.warning(self.format_log(format,*args))        
 
     def log_debug(self, format, *args):
         """Log a debug message.
