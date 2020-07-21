@@ -45,7 +45,7 @@ class PathMaker(dict):
 
         Which,whatever comes up in the list first,has a higher chace of getting sele
         '''
-        for keytester in self.keys():
+        for keytester in self.keys()[::-1]: # the last added path has the highest piority
             if keytester(key):
                 yield super().__getitem__(keytester)
 
@@ -78,7 +78,7 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         The `request` is provided to the router
         '''
         excepted_excptions = 0
-        for method in self.paths[request.path][::-1]: # the last added path has the highest piority
+        for method in self.paths[request.path]:
             try:
                 return method(request)
                 # Succeed,end this handle call
