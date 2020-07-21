@@ -78,7 +78,7 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         The `request` is provided to the router
         '''
         excepted_excptions = 0
-        for method in self.paths[request.path]:
+        for method in self.paths[request.path][::-1]: # the last added path has the highest piority
             try:
                 return method(request)
                 # Succeed,end this handle call
