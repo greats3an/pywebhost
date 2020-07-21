@@ -89,6 +89,7 @@ class HTTPModules():
             request.send_response(HTTPStatus.OK)
             if s:# a `real` file,which has file size properites
                 if support_range:request.send_header('Accept-Ranges','bytes')
+                request.send_header('Content-Disposition',f'attachment; filename="{os.path.basename(stream)}"')
                 request.send_header('Content-Length',str(s))
                 request.send_header('Content-Type',Utilties.GuessMIME(stream))
             request.end_headers()            
@@ -122,6 +123,7 @@ class HTTPModules():
             # Otherwise,good to go!
             request.send_response(HTTPStatus.PARTIAL_CONTENT)
             request.send_header('Accept-Ranges','bytes')
+            request.send_header('Content-Disposition',f'attachment; filename="{os.path.basename(stream)}"')
             request.send_header('Content-Length',str(end - start))
             request.send_header('Content-Type',Utilties.GuessMIME(stream))
             request.send_header('Content-Range','bytes %s-%s/%s' % (start,end,s))
