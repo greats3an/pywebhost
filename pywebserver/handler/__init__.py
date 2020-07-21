@@ -267,7 +267,7 @@ class RequestHandler(StreamRequestHandler):
                     message = ''
             if not hasattr(self, '_headers_buffer'):
                 self._headers_buffer = []
-            self._headers_buffer = [("%s %d %s\r\n" % (self.protocol_version, code, message)).encode('latin-1', 'strict')] + self._headers_buffer
+            self._headers_buffer = [("%s %d %s\r\n" % (self.protocol_version, code, message)).encode('utf-8')] + self._headers_buffer
             # Always send this at the begining
     
     def send_header(self, keyword, value):
@@ -276,7 +276,7 @@ class RequestHandler(StreamRequestHandler):
             if not hasattr(self, '_headers_buffer'):
                 self._headers_buffer = []
             self._headers_buffer.append(
-                ("%s: %s\r\n" % (keyword, value)).encode('latin-1', 'strict'))
+                ("%s: %s\r\n" % (keyword, value)).encode('utf-8'))
 
         if keyword.lower() == 'connection':
             if value.lower() == 'close':
