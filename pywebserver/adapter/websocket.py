@@ -4,7 +4,8 @@
 Offers simple ways of dealing with WS connections
 '''
 import logging,time,struct,random,base64,hashlib,typing,select,json
-from . import Adapter,AdapterConfidence,Property,BaseScheduler
+from . import Adapter,AdapterConfidence,Property
+from .. import BaseScheduler
 from http import HTTPStatus
 from enum import IntEnum
 from datetime import timedelta
