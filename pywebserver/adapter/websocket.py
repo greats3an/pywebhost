@@ -4,11 +4,13 @@
 Offers simple ways of dealing with WS connections
 '''
 import logging,time,struct,random,base64,hashlib,typing,select,json
+from logging import fatal
 from . import Adapter,AdapterConfidence,Property
 from .. import BaseScheduler
 from http import HTTPStatus
 from enum import IntEnum
 from datetime import timedelta
+from copy import deepcopy
 class WebsocketConnectionClosedException(Exception):
     def __init__(self,is_requested : bool):
         self.is_requested = is_requested
@@ -181,13 +183,15 @@ class Websocket(Adapter):
             }
         })
 
-    def __init__(self,request,*a,**k):  
+    def __init__(self,request,ignore_confidence=False,raw_frames=False):  
         '''Creates the websocket object
         
-           Use `ignore_confidence=True` to bypass `confidence` checking
+           `raw_frames`     :   DO NOT concatenate not finalized (fin=0) frames
         ''' 
-        super().__init__(request,*a,**k) 
+        super().__init__(request,ignore_confidence) 
+        self.raw_frames = raw_frames
         self.keep_alive,self.did_handshake,self.sched = True,False,BaseScheduler()
+        self.__buffer = bytearray()
         # Adds ourself into the server list
         # If the list is not present in the server,create it otherwise
         if not hasattr(self.request.server,'websockets'):setattr(self.request.server,'websockets',[])
@@ -229,7 +233,23 @@ class Websocket(Adapter):
             # accepts such request,raises an exception
             raise WebsocketConnectionClosedException(True)
         # All checks passed,proceed to perfrom the callback
-        self.onReceive(frame)
+        if self.raw_frames:return self.onReceive(frame)
+        # Do not concatenate the frames if said so
+        if not frame.FIN:
+            # A Single websocket frame can contain data up to 2^63 Bytes (8192 PB,the MSB's 0)
+            # But some clients use FIN bitmask to send little packets over time
+            # ...for safety measures.Which means more work needed to be done
+            return self.__buffer.extend(frame.PAYLOAD)
+            # Extend the buffer
+        elif frame.FIN:
+            # We have received,the buffer may be cleared next time
+            self.__buffer.extend(frame.PAYLOAD)
+            frame.PAYLOAD = deepcopy(self.__buffer)
+            # Make a shallow copy of it
+            frame.PAYLOAD_LENGTH = len(frame.PAYLOAD)
+            self.__buffer = bytearray()
+            # Clear the buffer,Done
+            return self.onReceive(frame)
 
     def send(self,frame:WebsocketFrame):
         '''
@@ -325,7 +345,7 @@ class Websocket(Adapter):
             If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length.
             '''
             binary.extend(struct.pack('>H', data.PAYLOAD_LENGTH))
-        elif data.PAYLOAD_LENGTH >= 65536 and data.PAYLOAD_LENGTH < 2**64:
+        elif data.PAYLOAD_LENGTH >= 65536 and data.PAYLOAD_LENGTH < 2**63: # mfw the MSB is always 0
             binary.append(self.__construct_byte(
                 [data.MASK] + self.__extract_byte(127)[1:]))
             '''

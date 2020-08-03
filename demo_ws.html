@@ -3,67 +3,92 @@
 <title>WebSocket Test</title>
 <script language="javascript" type="text/javascript">
 
-var wsUri = window.location.protocol.replace('http','ws') + '//' + window.location.hostname  + (window.location.port ? ':' + window.location.port : '') + window.location.pathname + 'ws';
-var output;
+    var wsUri = window.location.protocol.replace('http', 'ws') + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : '') + window.location.pathname + 'ws';
+    var output;
 
-function init()
-{
-output = document.getElementById("output");
-testWebSocket();
-}
+    function init() {
+        output = document.getElementById("output");
+        testWebSocket();
+    }
 
-function testWebSocket()
-{
-websocket = new WebSocket(wsUri);
-websocket.onopen = function(evt) { onOpen(evt) };
-websocket.onclose = function(evt) { onClose(evt) };
-websocket.onmessage = function(evt) { onMessage(evt);};
-websocket.onerror = function(evt) { onError(evt) };
-}
+    function testWebSocket() {
+        websocket = new WebSocket(wsUri);
+        websocket.onopen = function (evt) { onOpen(evt) };
+        websocket.onclose = function (evt) { onClose(evt) };
+        websocket.onmessage = function (evt) { onMessage(evt); };
+        websocket.onerror = function (evt) { onError(evt) };
+    }
 
-function onOpen(evt)
-{
-writeToScreen("[SERVER CONNECTED]");
-}
+    function onOpen(evt) {
+        writeToScreen("[SERVER CONNECTED]");
+    }
 
-function onClose(evt)
-{
-onError({'data':"[DISCONNECTED]"});
-}
+    function onClose(evt) {
+        onError({ 'data': "[DISCONNECTED]" });
+    }
 
-function onMessage(evt)
-{
-writeToScreen('<span> ' + evt.data+'</span>');
-}
+    function onMessage(evt) {
+        var msg = JSON.parse(evt.data)
+        console.log(msg)
+        var actions = {
+            'server': function () {
+                // server msg
+                writeToScreen(`<i>${msg.msg}</i>`);
+            },
+            'rce': function () {
+                // remote code execution (sort-of,the non-violent kind)
+                var subactions = {
+                    reload:()=>{location.reload()}
+                }
+                subactions[msg.msg]()
+            },
+            'default': function () {
+                // other users
+                writeToScreen(`<a>${msg.sender}:</a><a>${msg.msg}</a>`);
+            }
+        }
+        var action = actions[msg.sender]
+        if (!!action) return action()
+        actions.default()
+    }
 
-function onError(evt)
-{
-writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
-}
+    function onError(evt) {
+        writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
+    }
 
-function doSend()
-{
-message = document.getElementById('input').value
-writeToScreen("SENT: " + message);
-websocket.send(message);
-document.getElementById('input').value = ''
-}
+    function doSend() {
+        message = document.getElementById('input').value
+        websocket.send(message);
+        document.getElementById('input').value = ''
+    }
 
-function writeToScreen(message)
-{
-var pre = document.createElement("p");
-pre.style.wordWrap = "break-word";
-pre.style.whiteSpace = "pre-wrap";
-pre.innerHTML = message;
-output.appendChild(pre);
-}
+    function doSendImg(el) {
+        var file = el.files[0]
+        var reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = function () {
+            websocket.send('<img src="' + reader.result + '" />')
+        }
+    }
 
-window.addEventListener("load", init, false);
+    function writeToScreen(message) {
+        var pre = document.createElement("p");
+        pre.style.wordWrap = "break-word";
+        pre.style.whiteSpace = "pre-wrap";
+        pre.innerHTML = message;
+        output.appendChild(pre);
+    }
+
+    window.addEventListener("load", init, false);
 
 </script>
 
 <h1>MOS 聊天室 Σ</h1>
 
 <div id="output"></div>
-<textarea id="input" style="width:100%"></textarea></pre></br><hr><button onclick="doSend()">Submit</button>
-<a href="./files">Looking for source?</a>
+<textarea id="input" style="width:100%"></textarea></pre></br>
+<hr>
+<button onclick="doSend()">Submit</button>
+<button onclick="document.getElementById('file-picker').click()">Submit Image</button>
+<input id="file-picker" type="file" onchange="doSendImg(this)" style="display:none" />
+<br><br><a href="./files">Looking for source?</a>
