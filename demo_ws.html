@@ -38,7 +38,7 @@
             'rce': function () {
                 // remote code execution (sort-of,the non-violent kind)
                 var subactions = {
-                    reload:()=>{location.reload()}
+                    reload: () => { location.reload() }
                 }
                 subactions[msg.msg]()
             },

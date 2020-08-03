@@ -62,16 +62,18 @@ def GetStyleSheet():return '''
 '''
 # Stylesheet!
 
-@server.route(PathMakerModules.Absolute('/files'))
-def index(request : RequestHandler):
-    HTTPModules.RestrictVerbs(request,['GET'])
-    # Redirects to '/files'
-    HTTPModules.Redirect(request,'files/')
+# Server routing: Whatever comes later has higher piority of getting tested
 
 @server.route(PathMakerModules.DirectoryPath('/files/'))
 def subfolder(request : RequestHandler):
     # Indexes folders of local path and renders a webpage
     HTTPModules.IndexFolder(request,'./' + request.path[7:],GetStyleSheet())
+
+@server.route(PathMakerModules.Absolute('/files'))
+def index(request : RequestHandler):
+    HTTPModules.RestrictVerbs(request,['GET'])
+    # Redirects to '/files'
+    HTTPModules.Redirect(request,'files/')
 
 boardcasts = [{'sender':'server','msg':'<i>Server started at %s</i>' % RequestHandler.time_string(None)}]
 class WSChat(Websocket):
