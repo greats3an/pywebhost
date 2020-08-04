@@ -80,6 +80,10 @@ class WSChat(Websocket):
     # Using classes to do websocket jobs is recommended
     # This demo showcases a server-client based chat system
     # Which each client runs on its own thread
+    def __init__(self,request):
+        # Enable `Confidence` Check,Enable frame concatination
+        super().__init__(request,False,False)
+
     def msg(self,obj):return {'sender':self.name,'msg':str(obj)} if not isinstance(obj,dict) else obj
 
     def boardcast(self,message):
@@ -88,27 +92,24 @@ class WSChat(Websocket):
         boardcasts.append(msg)
         for ws in server.websockets:ws.send(msg)
 
-    def onReceive(self, frame : WebsocketFrame):
+    def onReceive(self, frame : bytearray):
         global boardcasts
         def others():return ",".join([ws_.name if hasattr(ws_,"name") else "[PENDING]" for ws_ in server.websockets if ws_ != self])
         if not hasattr(self,'name'):
             # 1st message,aquire username
-            setattr(self,'name', frame.PAYLOAD.decode())
+            setattr(self,'name', frame.decode())
 
             self.boardcast({'sender':'server','msg':f'<i>{self.name} Logged in</i>'})
             self.boardcast({'sender':'server','msg':f'<i>Other online users:{others() if others() else "No others online"}</i>'})
 
             return
-        message = frame.PAYLOAD.decode()
+        message = frame.decode()
         self.boardcast(message)
 
 @server.route(PathMakerModules.Absolute('/ws'))
 def websocket(request : RequestHandler):
     global boardcasts
-    # A simple WebSocket echo server,which will boardcast
-    # Message to all connected sessions
     ws = WSChat(request)
-    # Store the session
     ws.handshake()
     for b in boardcasts:ws.send(b)
     ws.send({'sender':'server','msg':'<b>Name yourself by typing your name here:</b>'})

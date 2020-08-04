@@ -3,33 +3,51 @@
 
 Offers simple ways of dealing with WS connections
 '''
-import logging,time,struct,random,base64,hashlib,typing,select,json
+import logging
+import time
+import struct
+import random
+import base64
+import hashlib
+import typing
+import select
+import json
 from logging import fatal
-from . import Adapter,AdapterConfidence,Property
+from typing import Union
+from . import Adapter, AdapterConfidence, Property
 from .. import BaseScheduler
 from http import HTTPStatus
 from enum import IntEnum
 from datetime import timedelta
 from copy import deepcopy
+
+
 class WebsocketConnectionClosedException(Exception):
-    def __init__(self,is_requested : bool):
+    def __init__(self, is_requested: bool):
         self.is_requested = is_requested
-        super().__init__(f'Client {"requested" if is_requested else "UNEXPECTLY"} closed connection')
+        super().__init__(
+            f'Client {"requested" if is_requested else "UNEXPECTLY"} closed connection')
+
 
 class WebsocketFrame():
     '''Provides docstrings and converters for Websocket Frame bits'''
     @staticmethod
     def bytes(d) -> bytearray:
         '''Converts any datatype to a mutable bytearray'''
-        if isinstance(d,str):return d.encode()
-        if isinstance(d,bytearray) or isinstance(d,bytes): return d
+        if isinstance(d, str):
+            return d.encode()
+        if isinstance(d, bytearray) or isinstance(d, bytes):
+            return d
         return WebsocketFrame.bytes(json.dumps(d))
 
-    def __init__(self,FIN=1,RSV1=0,RSV2=0,RSV3=0,OPCODE=1,MASK=0,PAYLOAD_LENGTH=0,MASKEY=0,PAYLOAD=b''):
-        self._FIN,self._RSV1,self._RSV2,self._RSV3,self._OPCODE,self._MASK,self._PAYLOAD_LENGTH,self._MASKEY,self._PAYLOAD = FIN,RSV1,RSV2,RSV3,OPCODE,MASK,PAYLOAD_LENGTH,MASKEY,self.bytes(PAYLOAD)
-        if not self._PAYLOAD_LENGTH:self._PAYLOAD_LENGTH = len(self._PAYLOAD)
+    def __init__(self, FIN=1, RSV1=0, RSV2=0, RSV3=0, OPCODE=1, MASK=0, PAYLOAD_LENGTH=0, MASKEY=0, PAYLOAD=b''):
+        self._FIN, self._RSV1, self._RSV2, self._RSV3, self._OPCODE, self._MASK, self._PAYLOAD_LENGTH, self._MASKEY, self._PAYLOAD = FIN, RSV1, RSV2, RSV3, OPCODE, MASK, PAYLOAD_LENGTH, MASKEY, self.bytes(
+            PAYLOAD)
+        if not self._PAYLOAD_LENGTH:
+            self._PAYLOAD_LENGTH = len(self._PAYLOAD)
         # Re-applie payload length if not given
         super().__init__()
+
     @Property
     def FIN(self):
         '''     FIN:  1 bit
@@ -37,6 +55,7 @@ class WebsocketFrame():
       Indicates that this is the final fragment in a message.  The first
       fragment MAY also be the final fragment.'''
         pass
+
     @Property
     def RSV1(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
@@ -47,6 +66,7 @@ class WebsocketFrame():
       value, the receiving endpoint MUST _Fail the WebSocket
       Connection_.'''
         pass
+
     @Property
     def RSV2(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
@@ -57,6 +77,7 @@ class WebsocketFrame():
       value, the receiving endpoint MUST _Fail the WebSocket
       Connection_.'''
         pass
+
     @Property
     def RSV3(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
@@ -67,6 +88,7 @@ class WebsocketFrame():
       value, the receiving endpoint MUST _Fail the WebSocket
       Connection_.'''
         pass
+
     @Property
     def OPCODE(self):
         '''Opcode:  4 bits
@@ -92,6 +114,7 @@ class WebsocketFrame():
 
       -  %xB-F are reserved for further control frames'''
         pass
+
     @Property
     def MASK(self):
         ''' Mask:  1 bit
@@ -101,6 +124,7 @@ class WebsocketFrame():
       the "Payload data" as per Section 5.3.  All frames sent from
       client to server have this bit set to 1.'''
         pass
+
     @Property
     def PAYLOAD_LENGTH(self):
         '''   Payload length:  7 bits, 7+16 bits, or 7+64 bits
@@ -119,6 +143,7 @@ class WebsocketFrame():
       zero, in which case the payload length is the length of the
       "Application data".'''
         pass
+
     @Property
     def MASKEY(self):
         '''  Masking-key:  0 or 4 bytes
@@ -129,6 +154,7 @@ class WebsocketFrame():
       is set to 0.  See Section 5.3 for further information on client-
       to-server masking.'''
         pass
+
     @Property
     def PAYLOAD(self):
         ''' Payload data:  (x+y) bytes
@@ -136,7 +162,8 @@ class WebsocketFrame():
       The "Payload data" is defined as "Extension data" concatenated
       with "Application data".'''
         pass
-    
+
+
 class Websocket(Adapter):
     '''
         # Websocket Adapter
@@ -174,29 +201,33 @@ class Websocket(Adapter):
     CLOSE_CONN = 0x8
     PING = 0x9
     PONG = 0xA
+
     @staticmethod
     def __confidence__(request) -> float:
         '''Websocket confidence,ranges from 0~1'''
-        return super(Websocket,Websocket).__confidence__(request,{
-            AdapterConfidence.headers:{
-                'Sec-WebSocket-Key':lambda v:1 if v and len(v) > 8 else 0
+        return super(Websocket, Websocket).__confidence__(request, {
+            AdapterConfidence.headers: {
+                'Sec-WebSocket-Key': lambda v: 1 if v and len(v) > 8 else 0
             }
         })
 
-    def __init__(self,request,ignore_confidence=False,raw_frames=False):  
+    def __init__(self, request, ignore_confidence=False, raw_frames=False):
         '''Creates the websocket object
-        
-           `raw_frames`     :   DO NOT concatenate not finalized (fin=0) frames
-        ''' 
-        super().__init__(request,ignore_confidence) 
+
+        - `raw_frames`      :       If `true`.the `onRecevie` callback will provide `WebsocketFrames` object instead of `bytearrays`
+        (which is the PAYLOAD of the Frame).Note that disabling `raw_frames` will also disable the 
+        concatnation of `FIN=0` packets.
+        '''
+        super().__init__(request, ignore_confidence)
         self.raw_frames = raw_frames
-        self.keep_alive,self.did_handshake,self.sched = True,False,BaseScheduler()
+        self.keep_alive, self.did_handshake, self.sched = True, False, BaseScheduler()
         self.__buffer = bytearray()
         # Adds ourself into the server list
         # If the list is not present in the server,create it otherwise
-        if not hasattr(self.request.server,'websockets'):setattr(self.request.server,'websockets',[])
+        if not hasattr(self.request.server, 'websockets'):
+            setattr(self.request.server, 'websockets', [])
         self.request.server.websockets.append(self)
-        
+
     def onOpen(self):
         '''Decides what to do once the handshake was perfromed'''
         pass
@@ -205,18 +236,20 @@ class Websocket(Adapter):
         '''Do Websocket handshake,must be done first after the request is parsed'''
         self.request.send_response(HTTPStatus.SWITCHING_PROTOCOLS)
         self.request.send_header('Connection', 'Upgrade')
-        self.request.send_header('Sec-WebSocket-Accept',self.__ws_gen_responsekey(self.request.headers.get('Sec-WebSocket-Key')))
+        self.request.send_header('Sec-WebSocket-Accept', self.__ws_gen_responsekey(
+            self.request.headers.get('Sec-WebSocket-Key')))
         self.request.send_header('Upgrade', 'websocket')
         self.request.end_headers()
         self.did_handshake = True
-        self.request.log_request('New Websocket session from %s:%s' % self.request.client_address)   
+        self.request.log_request(
+            'New Websocket session from %s:%s' % self.request.client_address)
         self.onOpen()
 
-    def onReceive(self, frame:WebsocketFrame):
+    def onReceive(self, frame: Union[bytearray,WebsocketFrame]):
         '''Decides what to do once a frame has been recevied'''
         pass
-    
-    def _onReceive(self, frame:WebsocketFrame):
+
+    def _onReceive(self, frame: WebsocketFrame):
         '''Base recevie method,deals with interal websocket codes and such
         DO NOT OVERRIDE unless you know what you're doing
         '''
@@ -233,8 +266,10 @@ class Websocket(Adapter):
             # accepts such request,raises an exception
             raise WebsocketConnectionClosedException(True)
         # All checks passed,proceed to perfrom the callback
-        if self.raw_frames:return self.onReceive(frame)
-        # Do not concatenate the frames if said so
+        if self.raw_frames:
+            return self.onReceive(frame)
+        # Return raw frames (including websockets masks) if said so
+        # Otherwise,parse the frame and return a bytearray as result
         if not frame.FIN:
             # A Single websocket frame can contain data up to 2^63 Bytes (8192 PB,the MSB's 0)
             # But some clients use FIN bitmask to send little packets over time
@@ -244,14 +279,12 @@ class Websocket(Adapter):
         elif frame.FIN:
             # We have received,the buffer may be cleared next time
             self.__buffer.extend(frame.PAYLOAD)
-            frame.PAYLOAD = deepcopy(self.__buffer)
-            # Make a shallow copy of it
-            frame.PAYLOAD_LENGTH = len(frame.PAYLOAD)
-            self.__buffer = bytearray()
+            self.onReceive(self.__buffer)
+            # Perform the real callback
+            return self.__buffer.clear()
             # Clear the buffer,Done
-            return self.onReceive(frame)
 
-    def send(self,frame:WebsocketFrame):
+    def send(self, frame: WebsocketFrame):
         '''
             Appends message to the buffer,Every message will be constructed as a Websocket Frame
         '''
@@ -263,22 +296,23 @@ class Websocket(Adapter):
         '''
         return self.__websocket_recieveframe(self.request.rfile)
 
-    def serve(self,ping_interval=1):
+    def serve(self, ping_interval=1):
         '''
             Starts processing I/O,and blocks until connection is closed or flag is set
 
-                
+
             `ping_interval`   :   WS `Ping` heartbeat interval in seconds,set `0` to disable it
         '''
         if not self.did_handshake:
             raise Exception("Handshake was not performed!")
         # Setup periodic tasks
         @self.sched.new(delta=timedelta(seconds=ping_interval))
-        def ping():self.send(WebsocketFrame(OPCODE=Websocket.PING))
+        def ping(): self.send(WebsocketFrame(OPCODE=Websocket.PING))
         # PING the client websocket every given seconds
         while self.keep_alive:
             try:
-                readable = select.select([self.request.request],[],[],1.0)[0]     
+                readable = select.select(
+                    [self.request.request], [], [], 1.0)[0]
                 if readable:
                     frame = self.receive()
                     self._onReceive(frame)
@@ -297,7 +331,7 @@ class Websocket(Adapter):
 
     def close_forced(self):
         '''Forcily closes the connection by killing the `serve` thread'''
-        self.keep_alive = False    
+        self.keep_alive = False
 
     def _onClose(self):
         '''Decides what to do once the connection is closed,either by the server or the client'''
@@ -335,8 +369,10 @@ class Websocket(Adapter):
             +---------------------------------------------------------------+
         '''
         binary = bytearray()
-        if not isinstance(data,WebsocketFrame):data=WebsocketFrame(PAYLOAD=data)
-        binary.append(self.__construct_byte([data.FIN, data.RSV1,data.RSV2,data.RSV3] + self.__extract_byte(data.OPCODE)[4:]))
+        if not isinstance(data, WebsocketFrame):
+            data = WebsocketFrame(PAYLOAD=data)
+        binary.append(self.__construct_byte(
+            [data.FIN, data.RSV1, data.RSV2, data.RSV3] + self.__extract_byte(data.OPCODE)[4:]))
         # 1st byte:FIN,RSV1,RSV2,RSV3,OPCODE
         if data.PAYLOAD_LENGTH >= 126 and data.PAYLOAD_LENGTH < 65536:
             binary.append(self.__construct_byte(
@@ -345,7 +381,7 @@ class Websocket(Adapter):
             If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length.
             '''
             binary.extend(struct.pack('>H', data.PAYLOAD_LENGTH))
-        elif data.PAYLOAD_LENGTH >= 65536 and data.PAYLOAD_LENGTH < 2**63: # mfw the MSB is always 0
+        elif data.PAYLOAD_LENGTH >= 65536 and data.PAYLOAD_LENGTH < 2**63:  # mfw the MSB is always 0
             binary.append(self.__construct_byte(
                 [data.MASK] + self.__extract_byte(127)[1:]))
             '''
@@ -433,7 +469,7 @@ class Websocket(Adapter):
 
                 j                           =                          i MOD 4
                 transformed-octet-i = original-octet-i XOR masking-key-octet-j
-            
+
         To get DECODED, loop through the octets (bytes a.k.a. characters for text data) of ENCODED and XOR the octet with the (i modulo 4)th octet of MASK.
         '''
         return bytearray([d[i] ^ k[i % 4] for i in range(0, len(d))])
@@ -463,21 +499,21 @@ class Websocket(Adapter):
             Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
 
         For this header field, the server has to take the value (as present
-        
+
         in the header field, e.g., the base64-encoded [RFC4648] version minus
-        
+
         any leading and trailing whitespace) and concatenate this with the
-       
+
         Globally Unique Identifier (GUID, [RFC4122]) "258EAFA5-E914-47DA-
-       
+
         95CA-C5AB0DC85B11" in string form, which is unlikely to be used by
-       
+
         network endpoints that do not understand the WebSocket Protocol.  A
-       
+
         SHA-1 hash (160 bits) [FIPS.180-3], base64-encoded (see Section 4 of
-       
+
         [RFC4648]), of this concatenation is then returned in the server's
-       
+
         handshake.
         '''
         GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
