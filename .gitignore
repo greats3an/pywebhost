@@ -8,3 +8,6 @@ test*
 *.dll
 *.build
 _old*
+build
+dist
+*.egg-info
