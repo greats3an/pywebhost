@@ -5,7 +5,7 @@ from .modules import PathMakerModules,UnfinishedException
 from http import HTTPStatus
 
 def Property(func):
-    '''Wrapper for static properties for `PyWebServer`'''
+    '''Wrapper for static properties for `PyWebHost`'''
     @property
     def wrapper(self):
         return getattr(self,'_' + func.__name__)
@@ -127,13 +127,13 @@ class PathMaker(dict):
             if keytester(key):
                 yield super().__getitem__(keytester)
 
-class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
+class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     '''
-        # PyWebServer
+        # PyWebHost
         
         To start a server:
 
-            server = PyWebServer(('',1234))
+            server = PyWebHost(('',1234))
             server.serve_forever()
 
         This way,you can test by typing `http://localhost:1234` into your browser
@@ -232,11 +232,11 @@ class PyWebServer(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         self.error_message_format = """\
 <head>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
-    <title>PyWebserver Error - %(code)d</title>
+    <title>PyWebHost Error - %(code)d</title>
 </head>
 <body>
     <center><h1>%(code)d %(message)s</h1></center>
-    <hr><center>%(explain)s - PyWebserver</center>
+    <hr><center>%(explain)s - PyWebHost</center>
 </body>
 """
         # Error page format. %(`code`)d %(`message`)s %(`explain`)s are usable

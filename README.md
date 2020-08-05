@@ -1,4 +1,4 @@
-# PyWebServer
+# PyWebHost
 Python-based All-in-One Webserver,Handles both `Websocket` and oridnary HTTP Requests
 
 ## Demo
