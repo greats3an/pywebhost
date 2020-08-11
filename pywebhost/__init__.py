@@ -168,7 +168,7 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
                         ready = selector.select(poll_interval)
                         try:
                             self.sched()
-                        except Exception:
+                        except:
                             pass
                         # bpo-35017: shutdown() called during select(), exit immediately.
                         if self._BaseServer__shutdown_request:
@@ -178,8 +178,7 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
 
                         self.service_actions()
             finally:
-                self.__shutdown_request = False
-                self.__is_shut_down.set()
+                self._BaseServer__is_shut_down.set()
 
     def __handle__(self, request : RequestHandler):
         '''

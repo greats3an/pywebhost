@@ -19,7 +19,7 @@ with open("README.md", "r",encoding='utf-8') as fh:
 
 setuptools.setup(
     name="pywebhost", # Replace with your own username
-    version="0.0.5",
+    version="0.0.6",
     author="greats3an",
     author_email="greats3an@gmail.com",
     description="A versatile webserver written in Python 3",
@@ -32,5 +32,5 @@ setuptools.setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],install_requires=requirements,
-    python_requires='>=3.2',
+    python_requires='>=3.6',
 )
