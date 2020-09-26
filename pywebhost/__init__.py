@@ -1,7 +1,8 @@
 import selectors,socketserver,time,typing
 from datetime import timedelta
-from .handler import RequestHandler
-from .modules import PathMakerModules,UnfinishedException
+from .handler import Request
+# from .modules import *
+from re import fullmatch
 from http import HTTPStatus
 
 def Property(func):
@@ -94,38 +95,34 @@ class BaseScheduler():
 class PathMaker(dict):
     '''For storing and handling path mapping
     
-        The keys and values are stored as functions.Or their addresses to be exact
+        The keys and values are stored as regex pattern strings
         Keys are used to check is the target URL matching the stored URL,which,using regexes will be a great idea
 
         To set an item:
 
-            pathmaker[Absoulte('/')] = lambda a:SendFile('index.html')
+            pathmaker[re.compile('/')] = lambda a:SendFile('index.html')
 
-        Thus,the server will be finding the functions simply with this:
+        The server will be finding the functions simply with this:
 
             pathmaker['/']()
 
-        Easy,right?
     '''
     def __init__(self):
         super().__init__()
 
-    def __setitem__(self, keytester, value):
-        '''
-        Setting an item,multiple values can be stacked '''
-        if not callable(keytester) or not callable(value):raise Exception('The keys & values must be callable')
-        super().__setitem__(keytester,value)
-
-        # Initalizes with an empty list
+    def __setitem__(self, pattern, value):
+        '''Sets an path to be routed'''
+        if not isinstance(pattern,str):raise Exception('The keys & values must be regexes string')
+        super().__setitem__(pattern,value)
 
     def __getitem__(self, key):
         '''Iterates all keys to find matching one
 
-        Which,whatever comes up in the list first,has a higher chace of getting sele
+        The last one added has a better piority of getting called
         '''
-        for keytester in list(self.keys())[::-1]: # the last added path has the highest piority
-            if keytester(key):
-                yield super().__getitem__(keytester)
+        for pattern in list(self.keys())[::-1]: # LIFO
+            if fullmatch(pattern,key):
+                yield super().__getitem__(pattern)
 
 class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     '''
@@ -136,12 +133,9 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
             server = PyWebHost(('',1234))
             server.serve_forever()
 
-        This way,you can test by typing `http://localhost:1234` into your browser
-        And BEHOLD!An error page.
-
-        Surely you are going to read the documents to make sth with this.
+        You can test by typing `http://localhost:1234` into your browser to retrive a glorious error page ((
     '''
-    def handle_error(self, request : RequestHandler, client_address):
+    def handle_error(self, request : Request, client_address):
         """Handle an error gracefully.  May be overridden.
 
         By default,it prints the latest stack trace
@@ -177,41 +171,33 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
             finally:
                 self._BaseServer__is_shut_down.set()
 
-    def __handle__(self, request : RequestHandler):
+    def __handle__(self, request : Request):
         '''
         Maps the request with the `PathMaker`
         
         The `request` is provided to the router
         '''
-        excepted_excptions = 0
         for method in self.paths[request.path]:
             try:
                 return method(request)
                 # Succeed,end this handle call
-            except UnfinishedException:
-                # Ignore UnfinishedException and go on
-                excepted_excptions += 1
             except Exception as e:
                 # For Other server-side exceptions,let the client know
                 return request.send_error(HTTPStatus.SERVICE_UNAVAILABLE,explain=str(e))
-        # Request's not handled,and no UnfinishedException is ever called:No URI matched
-        if not excepted_excptions:return request.send_error(HTTPStatus.NOT_FOUND)
-        # No fatal exceptions,assume the response is unfinished
-        request.send_error(HTTPStatus.FORBIDDEN)
-        request.end_headers()
-        # Give out HTTP 403 error
+        # Request's not handled:No URI matched
+        return request.send_error(HTTPStatus.NOT_FOUND)
 
-    def route(self,keytester : PathMakerModules):
+    def route(self,pattern):
         '''
         Routes a HTTP Request
 
         e.g:
 
-            @server.route(Absoulte('/'))
+            @server.route('/')
                 def index():lambda a:SendFile('index.html')
         '''
         def wrapper(method):
-            self.paths[keytester] = method
+            self.paths[pattern] = method
             return method
         return wrapper
 
@@ -236,4 +222,4 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
 </body>
 """
         # Error page format. %(`code`)d %(`message`)s %(`explain`)s are usable
-        super().__init__(server_address, RequestHandler)
+        super().__init__(server_address, Request)

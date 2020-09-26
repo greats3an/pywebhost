@@ -1,6 +1,6 @@
 .vscode
 __pycahce__
-*.pyc
+*.pyc*
 \!*
 html
 test*

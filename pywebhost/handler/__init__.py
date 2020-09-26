@@ -25,12 +25,8 @@ def Property(func):
 # Most web servers default to HTTP 0.9, i.e. don't send a status line.
 default_request_version = "HTTP/0.9"
 
-class RequestHandler(StreamRequestHandler):
-    """
-    Modified version of Python's internal HTTP/1.1 Compatiable `BaseHTTPHandler`
-
-    Modifications had been made to prettify the code and to fix some annoying stuff ;)
-    """
+class Request(StreamRequestHandler):
+    '''Internal HTTP handler but better'''
     def __init__(self, request, client_address, server):
         '''The `server`,which is what instantlizes this handler,must have `__handle__` method
         which takes 1 argument (for the handler itself) 
@@ -250,12 +246,13 @@ class RequestHandler(StreamRequestHandler):
         if self.command != 'HEAD' and body:
             self.wfile.write(body)
 
-    def send_response(self, code, message=None):
+    def send_response(self, code, message=None,end_headers=True):
         """Add the response header to the headers buffer and log the
         response code.
         """
         self.log_request(code)
         self.send_response_only(code, message)
+        if end_headers:self.end_headers()
 
     def send_response_only(self, code, message=None):
         """Send the response header only."""
@@ -270,13 +267,15 @@ class RequestHandler(StreamRequestHandler):
             self._headers_buffer = [("%s %d %s\r\n" % (self.protocol_version, code, message)).encode('utf-8')] + self._headers_buffer
             # Always send this at the begining
     
+    def clear_header(self):
+        self._headers_buffer = []
+
     def send_header(self, keyword, value):
         """Send a MIME header to the headers buffer."""
         if self.request_version != 'HTTP/0.9':
             if not hasattr(self, '_headers_buffer'):
                 self._headers_buffer = []
-            self._headers_buffer.append(
-                ("%s: %s\r\n" % (keyword, value)).encode('utf-8'))
+            self._headers_buffer.append(("%s: %s\r\n" % (keyword, value)).encode('utf-8'))
 
         if keyword.lower() == 'connection':
             if value.lower() == 'close':

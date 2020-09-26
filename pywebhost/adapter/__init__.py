@@ -1,4 +1,4 @@
-from ..handler import RequestHandler
+from ..handler import Request
 
 
 def Property(func):
@@ -105,7 +105,7 @@ class Adapter():
             confidence += m_confidence(request,weights[m_confidence])
         return confidence
 
-    def __init__(self,request:RequestHandler,ignore_confidence=False):
+    def __init__(self,request:Request,ignore_confidence=False):
         '''
         Provides basic Adapter model
 
@@ -149,7 +149,7 @@ class Adapter():
         '''Receive arbitary amount of data from the client,reserved for other adapters'''
         pass
     @Property
-    def request(self) -> RequestHandler:
+    def request(self) -> Request:
         '''`RequestHandler` Object,is overriden once Adpater is initalized'''
         pass
 import os
