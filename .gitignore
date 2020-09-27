@@ -11,3 +11,4 @@ _old*
 build
 dist
 *.egg-info
+*.whl

@@ -319,14 +319,13 @@ class Websocket(Adapter):
         # PING the client websocket every given seconds
         while self.keep_alive:
             try:
-                readable = select.select(
-                    [self.request.request], [], [], 1.0)[0]
+                readable = select.select([self.request.request], [], [], 0)[0]
                 if readable:
                     frame = self.receive()
                     self._onReceive(frame)
                 self.sched()
                 # Checks & runs periodic tasks
-                time.sleep(0.01)
+                # time.sleep(0.01)
             except Exception as e:
                 # Quit once any exception occured
                 self.request.log_error(str(e))

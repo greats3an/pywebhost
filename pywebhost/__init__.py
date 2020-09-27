@@ -9,7 +9,7 @@ from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
