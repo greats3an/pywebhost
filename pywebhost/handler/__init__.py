@@ -9,16 +9,6 @@ from io import BufferedIOBase
 Essentially static class variables
 '''
 
-def Property(func):
-    '''Wrapper for static properties for `Handler`'''
-    @property
-    def wrapper(self):
-        return getattr(self,'_' + func.__name__)
-    @wrapper.setter
-    def wrapper(self,value):
-        return setattr(self,'_' + func.__name__,value)
-    return wrapper
-
 # The default request version.  This only affects responses up until
 # the point where the request line is parsed, so it mainly decides what
 # the client gets back when sending a malformed request line.
@@ -26,7 +16,26 @@ def Property(func):
 default_request_version = "HTTP/0.9"
 
 class Request(StreamRequestHandler):
-    '''Internal HTTP handler but better'''
+    '''Base HTTP handler'''
+    """
+    Base properties
+    """
+
+    wfile : BufferedIOBase
+    '''`BufferedIOBase` like I/O for writing messages to sockets'''
+
+    rfile : BufferedIOBase
+    '''`BufferedIOBase` like I/O for reading messages from sockets'''
+    
+    headers : client.HTTPMessage
+    '''Contains parsed headers'''        
+
+    command : str
+    '''The request command (GET,POST,etc)'''
+
+    raw_requestline : str
+    '''Raw `HTTP` request line of the request'''
+
     def __init__(self, request, client_address, server):
         '''The `server`,which is what instantlizes this handler,must have `__handle__` method
         which takes 1 argument (for the handler itself) 
@@ -38,7 +47,7 @@ class Request(StreamRequestHandler):
         # Set this to HTTP/1.1 to enable automatic keepalive
         self.protocol_version = server.protocol_version
         # Error page formats
-        self.error_message_format = server.error_message_format
+        self.format_error_message = server.format_error_message
         # hack to maintain backwards compatibility
         self.responses = {
             v: (v.phrase, v.description)
@@ -219,8 +228,9 @@ class Request(StreamRequestHandler):
             message = shortmsg
         if explain is None:
             explain = longmsg
-        self.log_error("HTTP %d -- %s", code, message)
-        self.send_response(code, message)
+        self.log_error("HTTP %d -- %s", code, explain)
+        self.clear_header()
+        self.send_response_only(code, message)
         self.send_header('Connection', 'close')
 
         # Message body is omitted for cases described in:
@@ -233,11 +243,12 @@ class Request(StreamRequestHandler):
                          HTTPStatus.NOT_MODIFIED)):
             # HTML encode to prevent Cross Site Scripting attacks
             # (see bug #1100201)
-            content = (self.error_message_format % {
-                'code': code,
-                'message': escape(message, quote=False),
-                'explain': escape(explain, quote=False)
-            })
+            content = self.format_error_message(
+                code   =code,
+                message=escape(message, quote=False),
+                explain=escape(explain, quote=False),
+                request=self
+            )
             body = content.encode('UTF-8', 'replace')
             self.send_header("Content-Type", 'text/html;charset=utf-8')
             self.send_header('Content-Length', str(len(body)))
@@ -246,13 +257,12 @@ class Request(StreamRequestHandler):
         if self.command != 'HEAD' and body:
             self.wfile.write(body)
 
-    def send_response(self, code, message=None,end_headers=True):
+    def send_response(self, code, message=None):
         """Add the response header to the headers buffer and log the
         response code.
         """
         self.log_request(code)
         self.send_response_only(code, message)
-        if end_headers:self.end_headers()
 
     def send_response_only(self, code, message=None):
         """Send the response header only."""
@@ -292,6 +302,8 @@ class Request(StreamRequestHandler):
 
     def flush_headers(self):
         if hasattr(self, '_headers_buffer'):
+            if not self.protocol_version in self._headers_buffer[0].decode():
+                raise Exception('Request was not responed with `requst.send_response`.')
             self.wfile.write(b"".join(self._headers_buffer))
             self._headers_buffer = []
 
@@ -368,34 +380,7 @@ class Request(StreamRequestHandler):
         """
         self.logger.info(self.format_log(format,*args))
     
-    """
-    Properties.These funtions do nothing but providing documents
-    and will be overriden
-    """
-    @Property
-    def wfile(self) -> BufferedIOBase:
-        '''`BufferedIOBase` like I/O for writing messages to sockets'''
-        pass
 
-    @Property
-    def rfile(self) -> BufferedIOBase:
-        '''`BufferedIOBase` like I/O for reading messages from sockets'''
-        pass
-
-    @Property
-    def headers(self) -> client.HTTPMessage:
-        '''Contains parsed headers'''
-        pass
-
-    @Property
-    def command(self) -> str:
-        '''The request command (GET,POST,etc)'''
-        pass
-
-    @Property
-    def raw_requestline(self) -> str:
-        '''Raw `HTTP` request line of the request'''
-        pass
 
 import os
 __all__ = [i[:-3] for i in os.listdir(os.path.dirname(__file__)) if i[-2:] == 'py' and i != '__init__.py']

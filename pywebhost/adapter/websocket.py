@@ -14,13 +14,22 @@ import select
 import json
 from logging import fatal
 from typing import Union
-from . import Adapter, AdapterConfidence, Property
-from .. import BaseScheduler
+from . import Adapter, AdapterConfidence
+from ..handler.sched import BaseScheduler
 from http import HTTPStatus
 from enum import IntEnum
 from datetime import timedelta
 from copy import deepcopy
 
+def WebsocketFrameProperty(func):
+    '''Wrapper for static properties for `Adapter`'''
+    @property
+    def wrapper(self):
+        return getattr(self,'_' + func.__name__)
+    @wrapper.setter
+    def wrapper(self,value):
+        return setattr(self,'_' + func.__name__,value)
+    return wrapper
 
 class WebsocketConnectionClosedException(Exception):
     def __init__(self, is_requested: bool):
@@ -48,7 +57,7 @@ class WebsocketFrame():
         # Re-applie payload length if not given
         super().__init__()
 
-    @Property
+    @WebsocketFrameProperty
     def FIN(self):
         '''     FIN:  1 bit
 
@@ -56,7 +65,7 @@ class WebsocketFrame():
       fragment MAY also be the final fragment.'''
         pass
 
-    @Property
+    @WebsocketFrameProperty
     def RSV1(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
 
@@ -67,7 +76,7 @@ class WebsocketFrame():
       Connection_.'''
         pass
 
-    @Property
+    @WebsocketFrameProperty
     def RSV2(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
 
@@ -78,7 +87,7 @@ class WebsocketFrame():
       Connection_.'''
         pass
 
-    @Property
+    @WebsocketFrameProperty
     def RSV3(self):
         '''   RSV1, RSV2, RSV3:  1 bit each
 
@@ -89,7 +98,7 @@ class WebsocketFrame():
       Connection_.'''
         pass
 
-    @Property
+    @WebsocketFrameProperty
     def OPCODE(self):
         '''Opcode:  4 bits
 
@@ -115,7 +124,7 @@ class WebsocketFrame():
       -  %xB-F are reserved for further control frames'''
         pass
 
-    @Property
+    @WebsocketFrameProperty
     def MASK(self):
         ''' Mask:  1 bit
 
@@ -125,7 +134,7 @@ class WebsocketFrame():
       client to server have this bit set to 1.'''
         pass
 
-    @Property
+    @WebsocketFrameProperty
     def PAYLOAD_LENGTH(self):
         '''   Payload length:  7 bits, 7+16 bits, or 7+64 bits
 
@@ -144,7 +153,7 @@ class WebsocketFrame():
       "Application data".'''
         pass
 
-    @Property
+    @WebsocketFrameProperty
     def MASKEY(self):
         '''  Masking-key:  0 or 4 bytes
 
@@ -155,14 +164,13 @@ class WebsocketFrame():
       to-server masking.'''
         pass
 
-    @Property
+    @WebsocketFrameProperty
     def PAYLOAD(self):
         ''' Payload data:  (x+y) bytes
 
       The "Payload data" is defined as "Extension data" concatenated
       with "Application data".'''
         pass
-
 
 class Websocket(Adapter):
     '''

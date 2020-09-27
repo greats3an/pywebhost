@@ -1,20 +1,10 @@
 from ..handler import Request
 
-
-def Property(func):
-    '''Wrapper for static properties for `Adapter`'''
-    @property
-    def wrapper(self):
-        return getattr(self,'_' + func.__name__)
-    @wrapper.setter
-    def wrapper(self,value):
-        return setattr(self,'_' + func.__name__,value)
-    return wrapper
-
 class AdapterConfidence:
     '''
         A pack of confidence mapping types
     '''
+
     @staticmethod
     def const(request,weights : int):
         '''
@@ -90,6 +80,9 @@ class AdapterConfidence:
         return confidence
 
 class Adapter():
+
+    request : Request
+    '''Request object'''
     @staticmethod
     def __confidence__(request,weights={AdapterConfidence.const:1}):
         '''
@@ -148,10 +141,3 @@ class Adapter():
     def receive(self,message):
         '''Receive arbitary amount of data from the client,reserved for other adapters'''
         pass
-    @Property
-    def request(self) -> Request:
-        '''`RequestHandler` Object,is overriden once Adpater is initalized'''
-        pass
-import os
-__all__ = [i[:-3] for i in os.listdir(os.path.dirname(__file__)) if i[-2:] == 'py' and i != '__init__.py']
-from . import *

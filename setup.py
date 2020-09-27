@@ -1,4 +1,4 @@
-import setuptools
+import setuptools,pywebhost
 
 content = """'''{README}
 
@@ -19,7 +19,7 @@ with open("README.md", "r",encoding='utf-8') as fh:
 
 setuptools.setup(
     name="pywebhost", # Replace with your own username
-    version="0.0.7",
+    version=pywebhost.__version__,
     author="greats3an",
     author_email="greats3an@gmail.com",
     description="A versatile webserver written in Python 3",
