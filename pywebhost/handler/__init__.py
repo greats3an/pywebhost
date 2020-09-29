@@ -1,10 +1,11 @@
+from http.cookies import CookieError, SimpleCookie
 import logging,socket
 from datetime import datetime
 from socketserver import StreamRequestHandler,_SocketWriter
-from http import HTTPStatus, server , client
+from http import HTTPStatus, server , client , cookies
 from html import escape
-from urllib.parse import urlparse,parse_qs,unquote
-from io import BufferedIOBase
+from urllib.parse import quote, urlparse,parse_qs,unquote
+from io import BufferedIOBase, IOBase
 '''
 Essentially static class variables
 '''
@@ -14,6 +15,51 @@ Essentially static class variables
 # the client gets back when sending a malformed request line.
 # Most web servers default to HTTP 0.9, i.e. don't send a status line.
 default_request_version = "HTTP/0.9"
+
+_MAXLINE = 65536
+_MAXHEADERS = 100
+
+class Headers(dict):
+
+    def encode(self):
+        return str(self).encode()
+
+    def __str__(self) -> str:
+        # formatting the lines
+        buffer = []        
+        if self.response_line:buffer.append(self.response_line )
+        for k,v in self.items():buffer.append('%s: %s' % (k,v))
+        str_ = buffer[0] + '\n'.join(buffer[1:]) + '\r\n\r\n'
+        return str_
+
+    def __init__(self,response_line='') -> None:
+        self.response_line = response_line
+
+    def add_header_line(self,header_line : bytes):
+        if not isinstance(header_line,str):
+            header_line = header_line.decode()
+        header_line = header_line.strip().split(':',maxsplit=1)
+        # trying to decode the headers
+        if len(header_line) < 2 : return
+        key,value = header_line
+        self[key.strip()] = value.strip()
+        return key,value
+
+    @staticmethod
+    def parse(fp : IOBase):
+        """Parses only RFC2822 headers from a file pointer.
+        """
+        headers = Headers()
+        while True:
+            line = fp.readline(_MAXLINE + 1)
+            if len(line) > _MAXLINE:
+                raise client.LineTooLong("header line")
+            headers.add_header_line(line)
+            if len(headers) > _MAXHEADERS:
+                raise client.HTTPException("got more than %d headers" % _MAXHEADERS)
+            if line in (b'\r\n', b'\n', b''):
+                break      
+        return headers
 
 class Request(StreamRequestHandler):
     '''Base HTTP handler'''
@@ -27,9 +73,18 @@ class Request(StreamRequestHandler):
     rfile : BufferedIOBase
     '''`BufferedIOBase` like I/O for reading messages from sockets'''
     
-    headers : client.HTTPMessage
+    headers : Headers
     '''Contains parsed headers'''        
 
+    headers_buffer : Headers
+    '''The headers to be parsed'''
+
+    cookies : cookies.SimpleCookie
+    '''Contains request cookies'''
+
+    cookies_buffer : cookies.SimpleCookie
+    '''The cookies to be sent by us'''
+    
     command : str
     '''The request command (GET,POST,etc)'''
 
@@ -41,7 +96,6 @@ class Request(StreamRequestHandler):
         which takes 1 argument (for the handler itself) 
         '''
         self.logger = logging.getLogger('RequestHandler')
-
         '''These values are from the server'''
         # The version of the HTTP protocol we support.
         # Set this to HTTP/1.1 to enable automatic keepalive
@@ -53,7 +107,10 @@ class Request(StreamRequestHandler):
             v: (v.phrase, v.description)
             for v in HTTPStatus.__members__.values()
         }
-
+        self.headers = Headers()
+        self.headers_buffer = Headers()
+        self.cookies = SimpleCookie()
+        self.cookies_buffer = SimpleCookie()
         super().__init__(request, client_address, server)
 
     def parse_request(self):
@@ -69,7 +126,7 @@ class Request(StreamRequestHandler):
         self.command = None  # set in case of error on the first line
         self.request_version = default_request_version
         self.close_connection = True
-        requestline = str(self.raw_requestline, 'iso-8859-1')
+        requestline = self.raw_requestline.decode()
         requestline = requestline.rstrip('\r\n')
         self.requestline = requestline
         words = requestline.split()
@@ -110,15 +167,18 @@ class Request(StreamRequestHandler):
             self.close_connection = True
             if command != 'GET':
                 self.send_error(HTTPStatus.BAD_REQUEST,"Bad HTTP/0.9 request type (%r)" % command)
-                return False
+                return False        
         self.command, self.raw_path = command, path
         self.scheme, self.netloc, self.path, self.params, self.query, self.fragment = urlparse(self.raw_path)
         self.path = unquote(self.path)
         self.query = parse_qs(self.query) # Decodes query string to a `dict`
-        # Decode the URL
+        # Decode the URI
         # Examine the headers and look for a Connection directive.
         try:
-            self.headers = client.parse_headers(self.rfile,_class=client.HTTPMessage)
+            self.headers = Headers.parse(self.rfile)
+            if self.headers.get('Cookie'):
+                cookies = self.headers.get('Cookie').replace(' ','%20') # esacpe spaces : https://tools.ietf.org/html/rfc6265#section-4.1.1
+                self.cookies = SimpleCookie(cookies)                
         except client.LineTooLong as err:
             self.send_error(
                 HTTPStatus.REQUEST_HEADER_FIELDS_TOO_LARGE,
@@ -131,17 +191,19 @@ class Request(StreamRequestHandler):
                 "Too many headers",
                 str(err)
             )
-            return False
-
-        conntype = self.headers.get('Connection', "")
-        if conntype.lower() == 'close':
-            self.close_connection = True
-        elif (conntype.lower() == 'keep-alive' and
-              self.protocol_version >= "HTTP/1.1"):
-            self.close_connection = False
+            return False                    
+        # Decode the headers,cookies
+         
+        conntype = self.headers.get('Connection')
+        if conntype:
+            if conntype.lower() == 'close':
+                self.close_connection = True
+            elif (conntype.lower() == 'keep-alive' and
+                self.protocol_version >= "HTTP/1.1"):
+                self.close_connection = False
         # Examine the headers and look for an Expect directive
-        expect = self.headers.get('Expect', "")
-        if (expect.lower() == "100-continue" and
+        expect = self.headers.get('Expect')
+        if (expect and expect.lower() == "100-continue" and
                 self.protocol_version >= "HTTP/1.1" and
                 self.request_version >= "HTTP/1.1"):
             if not self.handle_expect_100():
@@ -256,6 +318,9 @@ class Request(StreamRequestHandler):
 
         if self.command != 'HEAD' and body:
             self.wfile.write(body)
+    
+    def response_line(self,code,message=''):
+        return "%s %d %s\r\n" % (self.protocol_version, code, message)
 
     def send_response(self, code, message=None):
         """Add the response header to the headers buffer and log the
@@ -272,20 +337,16 @@ class Request(StreamRequestHandler):
                     message = self.responses[code][0]
                 else:
                     message = ''
-            if not hasattr(self, '_headers_buffer'):
-                self._headers_buffer = []
-            self._headers_buffer = [("%s %d %s\r\n" % (self.protocol_version, code, message)).encode('utf-8')] + self._headers_buffer
+            self.headers_buffer.response_line = self.response_line(code,message)
             # Always send this at the begining
     
     def clear_header(self):
-        self._headers_buffer = []
+        self.headers_buffer = Headers()
 
     def send_header(self, keyword, value):
         """Send a MIME header to the headers buffer."""
         if self.request_version != 'HTTP/0.9':
-            if not hasattr(self, '_headers_buffer'):
-                self._headers_buffer = []
-            self._headers_buffer.append(("%s: %s\r\n" % (keyword, value)).encode('utf-8'))
+            self.headers_buffer[keyword] = value
 
         if keyword.lower() == 'connection':
             if value.lower() == 'close':
@@ -293,19 +354,22 @@ class Request(StreamRequestHandler):
             elif value.lower() == 'keep-alive':
                 self.close_connection = False
 
+    def send_cookies(self,key,value):
+        '''Sets a cookie'''
+        self.cookies_buffer[key]=value
+
     def end_headers(self):
-        """Adds the blank line ending the MIME headers to the buffer,
+        """Adds the cookies and blank line ending of the MIME headers to the buffer,
         then flushes the buffer"""
-        if self.request_version != 'HTTP/0.9':
-            self._headers_buffer.append(b"\r\n")
+        if self.request_version != 'HTTP/0.9':         
+            if self.cookies_buffer:self.headers_buffer.add_header_line(self.cookies_buffer.output())
             self.flush_headers()
 
     def flush_headers(self):
-        if hasattr(self, '_headers_buffer'):
-            if not self.protocol_version in self._headers_buffer[0].decode():
-                raise Exception('Request was not responed with `requst.send_response`.')
-            self.wfile.write(b"".join(self._headers_buffer))
-            self._headers_buffer = []
+        if not self.headers_buffer.response_line:
+            raise Exception('Request was not responed with `requst.send_response`.')    
+        self.wfile.write(self.headers_buffer.encode())
+        self.headers_buffer = Headers()
 
     def log_request(self, code='-'):
         """Log an accepted request.

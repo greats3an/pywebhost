@@ -1,4 +1,3 @@
-from ast import Bytes, parse
 from codecs import decode
 from http.client import CONTINUE, OK
 from io import BufferedIOBase, BufferedReader, IOBase,BytesIO
@@ -377,8 +376,9 @@ def Base64MessageWrapper(decode=True,encode=True,read=True,write=True):
         binary = any2str(readstream(request)) if previous_prefix_result is None else previous_prefix_result
         return binary if not decode else base64.b64decode(binary)
     def suffix(request,function_result):
-        if function_result and encode:
-            binary = base64.b64encode(function_result.encode())
+        if function_result:
+            binary = function_result.encode()
+            if encode:base64.b64encode(binary)
             if write:writestream(request,binary)
             return binary
         elif function_result:
