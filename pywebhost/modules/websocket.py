@@ -18,7 +18,7 @@ class WebsocketConnectionClosedException(Exception):
     def __init__(self, is_requested: bool):
         self.is_requested = is_requested
         super().__init__(
-            f'Client {"requested" if is_requested else "UNEXPECTLY"} closed connection')
+            f'Client {"requested" if is_requested else "UNEXPECTEDLY"} closed connection')
 
 class WebsocketFrame(object):
     '''Provides docstrings and converters for Websocket Frame bits'''

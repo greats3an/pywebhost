@@ -267,10 +267,13 @@ class Request(StreamRequestHandler):
             return
         except socket.timeout as e:
             #a read or a write timed out.  Discard this connection
-            self.log_error("Request timed out: %r", e)
+            self.log_error("Request timed out: %s", e)
             self.close_connection = True
             return
-
+        except ConnectionAbortedError as e:
+            self.log_error("Connection closed UNEXPECTEDLY")
+            self.close_connection = True
+            return            
     def handle(self):
         """Handle multiple requests if necessary."""
         self.close_connection = True
