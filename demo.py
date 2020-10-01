@@ -1,33 +1,24 @@
-from io import BytesIO, StringIO
-from build.lib.pywebhost.modules import WriteContentToRequest, writestream
-from codecs import decode, encode
+from io import BytesIO
+from codecs import encode
+from pywebhost.modules import WriteContentToRequest
 from pywebhost.modules.session import Session, SessionWrapper
-from pywebhost.modules.websocket import WebsocketSession , WebsocketSessionWrapper
-from pywebhost.modules import Base64MessageWrapper
-from pywebhost.handler import Request
-from pywebhost import PyWebHost,Request,JSONMessageWrapper
+from pywebhost import PyWebHost,Request
 
-import coloredlogs
-coloredlogs.install(0)
 server = PyWebHost(('',3000))
-
-conns = {}
 class wsapp(Session):
-    @property
-    def request_times(self):
-        global conns
-        if not self.session_id in conns.keys():
-            conns[self.session_id] = 0
-        conns[self.session_id] += 1
-        return conns[self.session_id]
-
+    def requestTimes(self):
+        self['REQUEST_TIMES'] = self['REQUEST_TIMES'] + 1 if 'REQUEST_TIMES' in self.keys() else 1
+        return self['REQUEST_TIMES']
     def _(self):    
+        '''The paths are mapped by replacing '/' -> '_',then calling local methods'''
         print('index path access')
         WriteContentToRequest(
             self.request,
-            BytesIO(encode('<p>Hi...<code>%s</code>....For your <code>No.%s</code> access</p>' % (self.session_id,self.request_times))),
+            BytesIO(encode(
+                '<p>Hi...<code>%s</code>....For your <code>No.%s</code> access</p>' % (self.session_id,self.requestTimes())
+            )),
             mime_type='text/html'
-        )
+        )    
     def onNotFound(self):
         print('not found',self.request.path)
         self.request.send_error(404)
