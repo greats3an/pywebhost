@@ -9,7 +9,7 @@ from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.0.3'
+__version__ = '1.0.4'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
@@ -19,7 +19,7 @@ class PathMaker(dict):
 
         To set an item:
 
-            pathmaker[re.compile('/')] = lambda a:SendFile('index.html')
+            pathmaker['/.*'] = lambda a:SendFile('index.html')
 
         The server will be finding the functions simply with this:
 

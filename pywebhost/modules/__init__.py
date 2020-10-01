@@ -10,6 +10,7 @@ import os,mimetypes,json,base64,select
 from typing import Any, NamedTuple, Type, Union
 
 class BadRequestException(Exception):
+    '''Exception with code and explaination'''
     def __init__(self,code,explain=None) -> None:
         self.code = code
         self.explain = explain

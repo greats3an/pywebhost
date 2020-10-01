@@ -1,26 +1,10 @@
-'''
-# Websocket Protocol
-
-Offers simple ways of dealing with WS connections
-'''
-import logging
-import time
-import struct
-import random
-import base64
-import hashlib
-import typing
-import select
-import json
-from logging import fatal
+import struct,random,base64,hashlib,typing,select,json
 from typing import Union
 from ..handler.sched import BaseScheduler
 from .session import Session
 from . import ModuleWrapper
 from http import HTTPStatus
-from enum import IntEnum
 from datetime import timedelta
-from copy import deepcopy
 
 def WebsocketFrameProperty(func):    
     @property
@@ -37,7 +21,7 @@ class WebsocketConnectionClosedException(Exception):
         super().__init__(
             f'Client {"requested" if is_requested else "UNEXPECTLY"} closed connection')
 
-class WebsocketFrame():
+class WebsocketFrame(object):
     '''Provides docstrings and converters for Websocket Frame bits'''
     @staticmethod
     def bytes(d) -> bytearray:
@@ -215,8 +199,7 @@ class WebsocketSession(Session):
         - `raw_frames`      :       If `true`.the `onRecevie` callback will provide `WebsocketFrames` object instead of `bytearrays`
         (which is the PAYLOAD of the Frame).Note that disabling `raw_frames` will also disable the 
         concatnation of `FIN=0` packets.
-        '''
-        print('enter ws session')
+        '''        
         super().__init__(request, *a,**k)
         self.raw_frames = raw_frames
         self.keep_alive, self.did_handshake, self.sched = True, False, BaseScheduler()
@@ -228,7 +211,7 @@ class WebsocketSession(Session):
         self.request.server.websockets.append(self)
 
     def onNotFound(self):
-        '''Dont do anything yet'''
+        '''Useless for WS connections'''
         pass
 
     def onOpen(self):
@@ -239,13 +222,14 @@ class WebsocketSession(Session):
         '''Do Websocket handshake,must be done first after the request is parsed'''
         self.request.send_response(HTTPStatus.SWITCHING_PROTOCOLS)
         self.request.send_header('Connection', 'Upgrade')
-        self.request.send_header('Sec-WebSocket-Accept', self.__ws_gen_responsekey(
-            self.request.headers.get('Sec-WebSocket-Key')))
+        self.request.send_header(
+            'Sec-WebSocket-Accept', 
+            self.__ws_gen_responsekey(self.request.headers.get('Sec-WebSocket-Key'))
+        )
         self.request.send_header('Upgrade', 'websocket')
         self.request.end_headers()
         self.did_handshake = True
-        self.request.log_request(
-            'New Websocket session from %s:%s' % self.request.client_address)
+        self.request.log_request('New Websocket session from %s:%s' % self.request.client_address)
         self.onOpen()
 
     def onReceive(self, frame: Union[bytearray,WebsocketFrame]):
@@ -267,7 +251,7 @@ class WebsocketSession(Session):
             # client requested to close connection -> end
             self.send(WebsocketFrame(OPCODE=WebsocketSession.CLOSE_CONN))
             # accepts such request,raises an exception
-            raise WebsocketConnectionClosedException(True)
+            return WebsocketConnectionClosedException(True)
         # All checks passed,proceed to perfrom the callback
         if self.raw_frames:
             return self.onReceive(frame)
@@ -317,10 +301,15 @@ class WebsocketSession(Session):
                 readable = select.select([self.request.request], [], [], 0)[0]
                 if readable:
                     frame = self.receive()
-                    self._onReceive(frame)
+                    if not frame:
+                        raise WebsocketConnectionClosedException(False)                    
+                    result = self._onReceive(frame)
+                    if isinstance(result,WebsocketConnectionClosedException):
+                        if result.is_requested:
+                            self.keep_alive = False # ends the connection
+                        else:raise result           # sends to the error log
                 self.sched()
-                # Checks & runs periodic tasks
-                # time.sleep(0.01)
+                # Checks & runs periodic tasks                
             except Exception as e:
                 # Quit once any exception occured
                 self.request.log_error(str(e))
@@ -331,12 +320,9 @@ class WebsocketSession(Session):
         '''Tries to close the connection via sending CLOSE_CONN Opcode'''
         self.send(WebsocketFrame(OPCODE=WebsocketSession.CLOSE_CONN))
 
-    def close_forced(self):
-        '''Forcily closes the connection by killing the `serve` thread'''
-        self.keep_alive = False
-
     def _onClose(self):
         '''Decides what to do once the connection is closed,either by the server or the client'''
+        self.set_session() # set it afterwards
         self.request.log_debug('Websocket Connection closed')
         self.request.server.websockets.remove(self)
         # kicks ourself out
@@ -432,7 +418,9 @@ class WebsocketSession(Session):
             |                     Payload Data continued ...                |
             +---------------------------------------------------------------+
         '''
-        b1, b2 = rfile.read(2)
+        b12 = rfile.read(2)
+        if not b12 : return # this would be empty if the socket was closed unexpectedly
+        b1, b2 = b12
         FIN, RSV1, RSV2, RSV3 = self.__extract_byte(b1)[:4]
         OPCODE = self.__construct_byte(self.__extract_byte(b1)[4:])
         MASK = self.__get_bit_at(b1, 0)
@@ -526,7 +514,7 @@ class WebsocketSession(Session):
 
 
 @ModuleWrapper
-def WebsocketSessionWrapper(raw_frames=False):
+def WebsocketSessionWrapper(raw_frames=False,**kwargs):
     '''Wrapper for websocket requests
 
     Usage:
@@ -554,7 +542,7 @@ def WebsocketSessionWrapper(raw_frames=False):
         if not issubclass(function_result,WebsocketSession):
             raise TypeError('A `pywebhost.WebsocketSession` (sub) class is required') 
         # Making the websocket connection
-        session = function_result(request,raw_frames=raw_frames)
+        session = function_result(request,raw_frames=raw_frames,**kwargs)
         session.handshake()
         session.serve()
     return None , suffix

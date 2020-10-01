@@ -19,9 +19,6 @@ class BaseScheduler():
             @sched.new(delta=1,run_once=True)
             def run():
                 print('Hello,I was ran the first!')
-            @sched.new(delta=2,run_once=True)
-            def run():
-                print('Bonjour,I was ran the second!')
             @sched.new(delta=timedelta(seconds=5),run_once=True)
             def run():
                 print('I was executed,and will never be executed again')

@@ -64,7 +64,7 @@ class Headers(dict):
         return headers
 
 class Request(StreamRequestHandler):
-    '''Base HTTP handler'''
+    '''`http` module's handler with extra perks & optimization'''
     """
     Base properties
     """
@@ -90,7 +90,7 @@ class Request(StreamRequestHandler):
         '''The `server`,which is what instantlizes this handler,must have `__handle__` method
         which takes 1 argument (for the handler itself) 
         '''
-        self.logger = logging.getLogger('RequestHandler')
+        self.logger = logging.getLogger('Request')
         '''These values are from the server'''
         # The version of the HTTP protocol we support.
         # Set this to HTTP/1.1 to enable automatic keepalive
