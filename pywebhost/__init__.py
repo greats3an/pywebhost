@@ -53,6 +53,7 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
 
         You can test by typing `http://localhost:1234` into your browser to retrive a glorious error page ((
     '''
+    daemon_threads = True
     def handle_error(self, request : Request, client_address):
         """Handle an error gracefully.  May be overridden.
 
@@ -135,7 +136,7 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     def __init__(self, server_address : tuple):
         self.paths = PathMaker()
         # A paths dictionary which has `lambda` objects as keys
-        self.protocol_version = "HTTP/1.0"
+        self.protocol_version = "HTTP/1.1"
         # What protocol version to use.
         # Here's a note:
         # HTTP 1.1 will automaticly keep the connections alive,so

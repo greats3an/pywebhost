@@ -2,8 +2,7 @@ from codecs import decode
 from http.client import CONTINUE, OK
 from io import BufferedIOBase, BufferedReader, IOBase,BytesIO
 from os import system
-import pywebhost
-import types
+import time
 from ..handler import Request
 from http import HTTPStatus
 import os,mimetypes,json,base64,select

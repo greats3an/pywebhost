@@ -7,6 +7,7 @@ from http import HTTPStatus,client,cookies
 from html import escape
 from urllib.parse import urlparse,parse_qs,unquote
 from io import BufferedIOBase, IOBase
+import time
 '''
 Essentially static class variables
 '''
@@ -17,8 +18,10 @@ Essentially static class variables
 # Most web servers default to HTTP 0.9, i.e. don't send a status line.
 default_request_version = "HTTP/0.9"
 default_response_code = OK
+
 _MAXLINE = 65536
 _MAXHEADERS = 100
+_MAXTIMEOUT = 60
 
 class Headers(dict):
 
@@ -85,7 +88,10 @@ class Request(StreamRequestHandler):
     '''The request command (GET,POST,etc)'''
     raw_requestline : str
     '''Raw `HTTP` request line of the request'''
-
+    raw_request : socket.socket
+    '''Raw TCP socket'''
+    close_connection : bool
+    '''Whether to preserve the connection (keep-alive one) or not'''
     def __init__(self, request, client_address, server):
         '''The `server`,which is what instantlizes this handler,must have `__handle__` method
         which takes 1 argument (for the handler itself) 
@@ -106,6 +112,8 @@ class Request(StreamRequestHandler):
         self.headers_buffer = Headers()
         self.cookies = SimpleCookie()
         self.cookies_buffer = SimpleCookie()
+        self.raw_request = request
+        self.raw_request.settimeout(_MAXTIMEOUT)
         super().__init__(request, client_address, server)
 
     def parse_request(self):
@@ -127,7 +135,6 @@ class Request(StreamRequestHandler):
         words = requestline.split()
         if len(words) == 0:  # Empty request line?
             return False
-
         if len(words) >= 3:  # Enough to determine protocol version
             version = words[-1]
             try:
@@ -187,8 +194,7 @@ class Request(StreamRequestHandler):
                 str(err)
             )
             return False                    
-        # Decode the headers,cookies
-         
+        # Decode the headers,cookies         
         conntype = self.headers.get('Connection')
         if conntype:
             if conntype.lower() == 'close':
@@ -246,7 +252,8 @@ class Request(StreamRequestHandler):
             '''Now,ask the server to process the request'''
             self.server.__handle__(request=self)
             if self.headers_buffer.response_line or self.headers_buffer:
-                raise ResponseNotReady('Response header lines were not flushed')
+                raise ResponseNotReady('Response header lines were not flushed')        
+            return
         except ResponseNotReady as e:
             self.log_error("Bad Response: %s",e)
             self.send_error(HTTPStatus.SERVICE_UNAVAILABLE)
@@ -261,11 +268,10 @@ class Request(StreamRequestHandler):
     def handle(self):
         """Handle multiple requests if necessary."""
         self.close_connection = True
-
-        self.handle_one_request()
-        while not self.close_connection:
-            self.handle_one_request()
-
+        self.handle_one_request()    
+        
+        while not self.close_connection:           
+            self.handle_one_request()          
     def send_error(self, code, message=None, explain=None):
         """Send and log an error reply.
 

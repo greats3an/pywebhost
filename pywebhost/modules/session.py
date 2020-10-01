@@ -52,7 +52,6 @@ class Session(dict):
         if self.session_id:
             if not self.session_id in _sessions.keys():_sessions[self.session_id] = {}
             _sessions[self.session_id].update(self)
-            print('SET:',_sessions)
 
     def onError(self,error):
         '''What to do when an execption occured
@@ -82,13 +81,13 @@ class Session(dict):
         self.request_func = Session.mapUri(self.request.path,self)
         self.update(self.get_session()) # loads session dict
         try:
+            self.onOpen()
             if not self.request_func or not '_' in self.request_func.__name__:
                 self.onNotFound()
-            else:
-                self.onOpen()
-                self.request_func_result = self.request_func()
-                self.onClose()
+            else:                
+                self.request_func_result = self.request_func()                
                 self.set_session()            # saves session dict
+            self.onClose()
             # calls the request func                
         except Exception as e:
             self.onError(e)        

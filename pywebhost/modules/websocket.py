@@ -207,8 +207,10 @@ class WebsocketSession(Session):
         # If the list is not present in the server,create it otherwise
         if not hasattr(self.request.server, 'websockets'):
             setattr(self.request.server, 'websockets', [])
+        self.request.raw_request.settimeout(None)
+        # no timeouts
         self.request.server.websockets.append(self)
-
+        
     def onNotFound(self):
         '''Useless for WS connections'''
         pass
