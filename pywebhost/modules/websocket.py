@@ -1,6 +1,5 @@
 import struct,random,base64,hashlib,typing,select,json
 from typing import Union
-from ..handler.sched import BaseScheduler
 from .session import Session
 from . import ModuleWrapper
 from http import HTTPStatus
@@ -202,7 +201,7 @@ class WebsocketSession(Session):
         '''        
         super().__init__(request, *a,**k)
         self.raw_frames = raw_frames
-        self.keep_alive, self.did_handshake, self.sched = True, False, BaseScheduler()
+        self.keep_alive, self.did_handshake = True, False
         self.__buffer = bytearray()
         # Adds ourself into the server list
         # If the list is not present in the server,create it otherwise
@@ -283,7 +282,7 @@ class WebsocketSession(Session):
         '''
         return self.__websocket_recieveframe(self.request.rfile)
 
-    def serve(self, ping_interval=1):
+    def serve(self):
         '''
             Starts processing I/O,and blocks until connection is closed or flag is set
 
@@ -292,23 +291,17 @@ class WebsocketSession(Session):
         '''
         if not self.did_handshake:
             raise Exception("Handshake was not performed!")
-        # Setup periodic tasks
-        @self.sched.new(delta=timedelta(seconds=ping_interval))
-        def ping(): self.send(WebsocketFrame(OPCODE=WebsocketSession.PING))
-        # PING the client websocket every given seconds
+        
         while self.keep_alive:
-            try:
-                readable = select.select([self.request.request], [], [], 0)[0]
-                if readable:
-                    frame = self.receive()
-                    if not frame:
-                        raise WebsocketConnectionClosedException(False)                    
-                    result = self._onReceive(frame)
-                    if isinstance(result,WebsocketConnectionClosedException):
-                        if result.is_requested:
-                            self.keep_alive = False # ends the connection
-                        else:raise result           # sends to the error log
-                self.sched()
+            try:                                
+                frame = self.receive()
+                if not frame:
+                    raise WebsocketConnectionClosedException(False)                    
+                result = self._onReceive(frame)
+                if isinstance(result,WebsocketConnectionClosedException):
+                    if result.is_requested:
+                        self.keep_alive = False # ends the connection
+                    else:raise result           # sends to the error log
                 # Checks & runs periodic tasks                
             except Exception as e:
                 # Quit once any exception occured

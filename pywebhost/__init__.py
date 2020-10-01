@@ -3,13 +3,12 @@ from pywebhost.modules import BadRequestException
 import selectors,socketserver,sys
 
 from .handler import Request
-from .handler.sched import BaseScheduler
 from .modules import *
 # from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.0.4'
+__version__ = '1.0.5'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
@@ -79,13 +78,11 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
                     selector.register(self, selectors.EVENT_READ)
                     while not self._BaseServer__shutdown_request:
                         ready = selector.select(poll_interval)                        
-                        self.sched()
                         # bpo-35017: shutdown() called during select(), exit immediately.
                         if self._BaseServer__shutdown_request:
                             break
                         if ready:
                             self._handle_request_noblock()
-
                         self.service_actions()
             finally:
                 self._BaseServer__is_shut_down.set()
@@ -138,8 +135,6 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     def __init__(self, server_address : tuple):
         self.paths = PathMaker()
         # A paths dictionary which has `lambda` objects as keys
-        self.sched = BaseScheduler()
-        # A synconous schedulation class which runs in the listening thread
         self.protocol_version = "HTTP/1.0"
         # What protocol version to use.
         # Here's a note:
