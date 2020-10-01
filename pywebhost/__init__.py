@@ -9,7 +9,7 @@ from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
@@ -148,6 +148,3 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
 
         # Error page format. %(`code`)d %(`message`)s %(`explain`)s are usable
         super().__init__(server_address, Request)
-
-from .adapter.websocket import *
-# Websocket support        

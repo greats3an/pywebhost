@@ -3,7 +3,6 @@ from http.client import CONTINUE, OK
 from io import BufferedIOBase, BufferedReader, IOBase,BytesIO
 from os import system
 import pywebhost
-from pywebhost.adapter.websocket import Websocket
 import types
 from ..handler import Request
 from http import HTTPStatus
@@ -233,40 +232,6 @@ def WriteContentToRequest(
             request.send_header('Accept-Ranges','bytes')
             if send_range(request):return True
     return send_once(request)
-
-@ModuleWrapper
-def WebsocketSessionWrapper(raw_frames=False):
-    '''Wrapper for websocket requests
-
-    Usage:
-
-        ...
-        from pywebhost import Websocket
-        class WSApp(Websocket):
-            def onOpen(self):
-                ...
-            def onClose(self):
-                ...
-            def onRecevie(self):
-                ...
-        @server.route('/ws')
-        @WebsocketSessionWrapper(raw_frames=False)
-        def wsapp(request : Request,content):
-            return WSApp
-    Args:
-
-        raw_frames (bool, optional): To receive concatnated content as bytearrary or raw websocket frames. Defaults to False.
-    '''
-    def suffix(request,function_result : pywebhost.Websocket):
-        if not function_result:
-            return # Dropping connection
-        if not issubclass(function_result,Websocket):
-            raise TypeError('A `pywebhost.Websocket` (sub) class is required') 
-        # Making the websocket connection
-        session = function_result(request,raw_frames=raw_frames)
-        session.handshake()
-        session.serve()
-    return None , suffix
 
 @ModuleWrapper
 def VerbRestrictionWrapper(verbs : list = ['GET','POST']) -> None:

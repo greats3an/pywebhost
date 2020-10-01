@@ -1,10 +1,11 @@
-from http.cookies import CookieError, SimpleCookie
+from http.client import OK, ResponseNotReady
+from http.cookies import SimpleCookie
 import logging,socket
 from datetime import datetime
-from socketserver import StreamRequestHandler,_SocketWriter
-from http import HTTPStatus, server , client , cookies
+from socketserver import StreamRequestHandler
+from http import HTTPStatus,client,cookies
 from html import escape
-from urllib.parse import quote, urlparse,parse_qs,unquote
+from urllib.parse import urlparse,parse_qs,unquote
 from io import BufferedIOBase, IOBase
 '''
 Essentially static class variables
@@ -15,7 +16,7 @@ Essentially static class variables
 # the client gets back when sending a malformed request line.
 # Most web servers default to HTTP 0.9, i.e. don't send a status line.
 default_request_version = "HTTP/0.9"
-
+default_response_code = OK
 _MAXLINE = 65536
 _MAXHEADERS = 100
 
@@ -30,6 +31,7 @@ class Headers(dict):
         if self.response_line:buffer.append(self.response_line )
         for k,v in self.items():buffer.append('%s: %s' % (k,v))
         str_ = buffer[0] + '\n'.join(buffer[1:]) + '\r\n\r\n'
+        
         return str_
 
     def __init__(self,response_line='') -> None:
@@ -69,25 +71,18 @@ class Request(StreamRequestHandler):
 
     wfile : BufferedIOBase
     '''`BufferedIOBase` like I/O for writing messages to sockets'''
-
     rfile : BufferedIOBase
     '''`BufferedIOBase` like I/O for reading messages from sockets'''
-    
     headers : Headers
     '''Contains parsed headers'''        
-
     headers_buffer : Headers
     '''The headers to be parsed'''
-
     cookies : cookies.SimpleCookie
     '''Contains request cookies'''
-
     cookies_buffer : cookies.SimpleCookie
     '''The cookies to be sent by us'''
-    
     command : str
     '''The request command (GET,POST,etc)'''
-
     raw_requestline : str
     '''Raw `HTTP` request line of the request'''
 
@@ -250,7 +245,13 @@ class Request(StreamRequestHandler):
                 return
             '''Now,ask the server to process the request'''
             self.server.__handle__(request=self)
-            self.wfile.flush() #actually send the response if not already done.
+            if self.headers_buffer.response_line or self.headers_buffer:
+                raise ResponseNotReady('Response header lines were not flushed')
+        except ResponseNotReady as e:
+            self.log_error("Bad Response: %s",e)
+            self.send_error(HTTPStatus.SERVICE_UNAVAILABLE)
+            self.close_connection = True
+            return
         except socket.timeout as e:
             #a read or a write timed out.  Discard this connection
             self.log_error("Request timed out: %r", e)
@@ -444,8 +445,4 @@ class Request(StreamRequestHandler):
         """
         self.logger.info(self.format_log(format,*args))
     
-
-
-import os
-__all__ = [i[:-3] for i in os.listdir(os.path.dirname(__file__)) if i[-2:] == 'py' and i != '__init__.py']
-from . import *
+import sched

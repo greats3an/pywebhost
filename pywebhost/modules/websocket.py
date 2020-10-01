@@ -14,15 +14,15 @@ import select
 import json
 from logging import fatal
 from typing import Union
-from . import Adapter, AdapterConfidence
 from ..handler.sched import BaseScheduler
+from .session import Session
+from . import ModuleWrapper
 from http import HTTPStatus
 from enum import IntEnum
 from datetime import timedelta
 from copy import deepcopy
 
-def WebsocketFrameProperty(func):
-    '''Wrapper for static properties for `Adapter`'''
+def WebsocketFrameProperty(func):    
     @property
     def wrapper(self):
         return getattr(self,'_' + func.__name__)
@@ -36,7 +36,6 @@ class WebsocketConnectionClosedException(Exception):
         self.is_requested = is_requested
         super().__init__(
             f'Client {"requested" if is_requested else "UNEXPECTLY"} closed connection')
-
 
 class WebsocketFrame():
     '''Provides docstrings and converters for Websocket Frame bits'''
@@ -172,9 +171,9 @@ class WebsocketFrame():
       with "Application data".'''
         pass
 
-class Websocket(Adapter):
+class WebsocketSession(Session):
     '''
-        # Websocket Adapter
+        # Websocket session
 
         - request          :      BaseHandler request
         - handshake        :       Performs the handshake,--MUST-- be done before any further operation
@@ -200,7 +199,7 @@ class Websocket(Adapter):
             ...
 
         The requests,once being adapted into `Websocket` objects,will be added to the `server`'s 
-        `websockets` list as a `Adapter` object
+        `websockets` list
     '''
     # Websocket OpCodes
     CONTINUATION = 0x0
@@ -210,23 +209,15 @@ class Websocket(Adapter):
     PING = 0x9
     PONG = 0xA
 
-    @staticmethod
-    def __confidence__(request) -> float:
-        '''Websocket confidence,ranges from 0~1'''
-        return super(Websocket, Websocket).__confidence__(request, {
-            AdapterConfidence.headers: {
-                'Sec-WebSocket-Key': lambda v: 1 if v and len(v) > 8 else 0
-            }
-        })
-
-    def __init__(self, request, ignore_confidence=False, raw_frames=False):
+    def __init__(self, request,raw_frames=False,*a,**k):
         '''Creates the websocket object
 
         - `raw_frames`      :       If `true`.the `onRecevie` callback will provide `WebsocketFrames` object instead of `bytearrays`
         (which is the PAYLOAD of the Frame).Note that disabling `raw_frames` will also disable the 
         concatnation of `FIN=0` packets.
         '''
-        super().__init__(request, ignore_confidence)
+        print('enter ws session')
+        super().__init__(request, *a,**k)
         self.raw_frames = raw_frames
         self.keep_alive, self.did_handshake, self.sched = True, False, BaseScheduler()
         self.__buffer = bytearray()
@@ -235,6 +226,10 @@ class Websocket(Adapter):
         if not hasattr(self.request.server, 'websockets'):
             setattr(self.request.server, 'websockets', [])
         self.request.server.websockets.append(self)
+
+    def onNotFound(self):
+        '''Dont do anything yet'''
+        pass
 
     def onOpen(self):
         '''Decides what to do once the handshake was perfromed'''
@@ -261,16 +256,16 @@ class Websocket(Adapter):
         '''Base recevie method,deals with interal websocket codes and such
         DO NOT OVERRIDE unless you know what you're doing
         '''
-        if frame.OPCODE == Websocket.PING:
+        if frame.OPCODE == WebsocketSession.PING:
             # ping -> pong -> end
-            self.send(WebsocketFrame(OPCODE=Websocket.PONG))
+            self.send(WebsocketFrame(OPCODE=WebsocketSession.PONG))
             return False
-        if frame.OPCODE == Websocket.PONG:
+        if frame.OPCODE == WebsocketSession.PONG:
             # pong -> ignore -> end
             return False
-        elif frame.OPCODE == Websocket.CLOSE_CONN:
+        elif frame.OPCODE == WebsocketSession.CLOSE_CONN:
             # client requested to close connection -> end
-            self.send(WebsocketFrame(OPCODE=Websocket.CLOSE_CONN))
+            self.send(WebsocketFrame(OPCODE=WebsocketSession.CLOSE_CONN))
             # accepts such request,raises an exception
             raise WebsocketConnectionClosedException(True)
         # All checks passed,proceed to perfrom the callback
@@ -315,7 +310,7 @@ class Websocket(Adapter):
             raise Exception("Handshake was not performed!")
         # Setup periodic tasks
         @self.sched.new(delta=timedelta(seconds=ping_interval))
-        def ping(): self.send(WebsocketFrame(OPCODE=Websocket.PING))
+        def ping(): self.send(WebsocketFrame(OPCODE=WebsocketSession.PING))
         # PING the client websocket every given seconds
         while self.keep_alive:
             try:
@@ -334,7 +329,7 @@ class Websocket(Adapter):
 
     def close(self):
         '''Tries to close the connection via sending CLOSE_CONN Opcode'''
-        self.send(WebsocketFrame(OPCODE=Websocket.CLOSE_CONN))
+        self.send(WebsocketFrame(OPCODE=WebsocketSession.CLOSE_CONN))
 
     def close_forced(self):
         '''Forcily closes the connection by killing the `serve` thread'''
@@ -528,3 +523,38 @@ class Websocket(Adapter):
         # returns SHA-1 hash and b64 encoded concatenation
         rkey = base64.b64encode(hashlib.sha1(rkey.encode()).digest())
         return rkey.decode()
+
+
+@ModuleWrapper
+def WebsocketSessionWrapper(raw_frames=False):
+    '''Wrapper for websocket requests
+
+    Usage:
+
+        ...
+        from pywebhost import Websocket
+        class WSApp(Websocket):
+            def onOpen(self):
+                ...
+            def onClose(self):
+                ...
+            def onRecevie(self):
+                ...
+        @server.route('/ws')
+        @WebsocketSessionWrapper(raw_frames=False)
+        def wsapp(request : Request,content):
+            return WSApp
+    Args:
+
+        raw_frames (bool, optional): To receive concatnated content as bytearrary or raw websocket frames. Defaults to False.
+    '''
+    def suffix(request,function_result : WebsocketSession):
+        if not function_result:
+            return # Dropping connection
+        if not issubclass(function_result,WebsocketSession):
+            raise TypeError('A `pywebhost.WebsocketSession` (sub) class is required') 
+        # Making the websocket connection
+        session = function_result(request,raw_frames=raw_frames)
+        session.handshake()
+        session.serve()
+    return None , suffix
