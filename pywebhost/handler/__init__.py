@@ -129,7 +129,13 @@ class Request(StreamRequestHandler):
         self.command = None  # set in case of error on the first line
         self.request_version = default_request_version
         self.close_connection = True
-        requestline = self.raw_requestline.decode()
+        try:
+            requestline = self.raw_requestline.decode()    
+        except UnicodeDecodeError as e:
+            # Bad request,this is mostly caused by bad SSL support
+            self.log_error('Bad request line: %s',e)
+            self.close_connection = True
+            return False
         requestline = requestline.rstrip('\r\n')
         self.requestline = requestline
         words = requestline.split()
@@ -268,8 +274,7 @@ class Request(StreamRequestHandler):
     def handle(self):
         """Handle multiple requests if necessary."""
         self.close_connection = True
-        self.handle_one_request()    
-        
+        self.handle_one_request()            
         while not self.close_connection:           
             self.handle_one_request()          
     def send_error(self, code, message=None, explain=None):

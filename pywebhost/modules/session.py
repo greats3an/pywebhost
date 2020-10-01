@@ -80,14 +80,14 @@ class Session(dict):
         # try to map the request path to our local path
         self.request_func = Session.mapUri(self.request.path,self)
         self.update(self.get_session()) # loads session dict
-        try:
-            self.onOpen()
+        try:            
             if not self.request_func or not '_' in self.request_func.__name__:
                 self.onNotFound()
             else:                
+                self.onOpen()
                 self.request_func_result = self.request_func()                
                 self.set_session()            # saves session dict
-            self.onClose()
+                self.onClose()
             # calls the request func                
         except Exception as e:
             self.onError(e)        
