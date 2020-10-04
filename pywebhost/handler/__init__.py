@@ -267,7 +267,7 @@ class Request(StreamRequestHandler):
             return
         except socket.timeout as e:
             #a read or a write timed out.  Discard this connection
-            self.log_error("Request timed out: %s", e)
+            # self.log_error("Request timed out: %s", e)
             self.close_connection = True
             return
         except ConnectionAbortedError as e:
@@ -342,6 +342,7 @@ class Request(StreamRequestHandler):
         response code.
         """
         self.log_request(code)
+        self.send_header('Content-Length',0)
         self.send_response_only(code, message)
 
     def send_response_only(self, code, message=None):
@@ -382,7 +383,7 @@ class Request(StreamRequestHandler):
 
     def flush_headers(self):
         if not self.headers_buffer.response_line:
-            raise Exception('Request was not responed with `requst.send_response`.')    
+            raise ResponseNotReady('No response line is present')
         self.wfile.write(self.headers_buffer.encode())
         self.headers_buffer = Headers()
 
@@ -403,9 +404,6 @@ class Request(StreamRequestHandler):
         """Returns the client UA header,if applicable"""
         return self.headers.get('User-Agent')
 
-    def time_string(self):
-        return str(datetime.now())
-
     def format_log(self,format,*args):
         """
         Formats a logging message
@@ -419,10 +417,10 @@ class Request(StreamRequestHandler):
             {Client Address} [{Time}] "{Verb} {Path} {HTTP Version}" {Message} {User-Agent}
         """
         try:
-            return f'{self.address_string()} [{self.time_string()}]' + f'"{self.command} {self.path} {self.base_version_number}" {format % args} {self.useragent_string()}'
+            return f'{self.address_string()} "{self.command} {self.path} {self.base_version_number}" {format % args} {self.useragent_string()}'
         except Exception:
             # If an exception ouccred,fallback to another format            
-            return f'{self.address_string()} [{self.time_string()}] {format % args}'
+            return f'{self.address_string()} {format % args}'
     
     def log_error(self, format, *args):
         """Log an error.

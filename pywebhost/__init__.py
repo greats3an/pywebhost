@@ -8,7 +8,7 @@ from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.0.8'
+__version__ = '1.0.9'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
@@ -96,7 +96,7 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         '''
         for method in self.paths[request.path]:
             try:
-                return method(request,None)
+                return method(self,request,None)
                 # Succeed,end this handle call
             except BadRequestException as e:
                 # For Other server-side exceptions,let the client know

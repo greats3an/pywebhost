@@ -38,7 +38,7 @@ class Session(dict):
         return session_id.value
     
     def get_session(self):
-        '''Gets session dictionary by uid,maybe overridden
+        '''Gets session dictionary by uid,may be overridden
         
         Returns:
             dict : The such dict
@@ -48,7 +48,7 @@ class Session(dict):
             return _sessions[self.session_id]
         return {}
     def set_session(self):
-        '''Saves session dictionary by updating it with our values'''
+        '''Saves session dictionary by updating it with our values,may be overridden'''
         if self.session_id:
             if not self.session_id in _sessions.keys():_sessions[self.session_id] = {}
             _sessions[self.session_id].update(self)
@@ -59,7 +59,7 @@ class Session(dict):
         Args:
             error (Execption): The said exception
         '''
-        pass
+        self.request.send_error(503,explain=str(error))
 
     def onNotFound(self):
         '''What to do when the path cannot be mapped'''
@@ -71,7 +71,7 @@ class Session(dict):
 
     def onClose(self):
         '''What to do when the session ends'''
-        self.request.flush_headers()        
+        pass    
 
     def __init__(self,request : Request,use_session_id=True) -> None:           
         super().__init__()
@@ -81,11 +81,11 @@ class Session(dict):
         self.request_func = Session.mapUri(self.request.path,self)
         self.update(self.get_session()) # loads session dict
         try:            
-            if not self.request_func or not '_' in self.request_func.__name__:
+            if not self.request_func:
                 self.onNotFound()
             else:                
                 self.onOpen()
-                self.request_func_result = self.request_func()                
+                self.request_func_result = self.request_func(self.request,None)
                 self.set_session()            # saves session dict
                 self.onClose()
             # calls the request func                

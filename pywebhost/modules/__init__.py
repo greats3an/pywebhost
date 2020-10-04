@@ -51,9 +51,9 @@ def ModuleWrapper(provider):
     def UserWrapper(*a,**k):
         prefix,suffix = provider(*a,**k)
         def RequestFunctionWrapper(function):
-            def RequestWrapper(request : Request,previous_prefix_result=None):
+            def RequestWrapper(initator : object,request : Request,previous_prefix_result=None):                
                 prefix_result   = prefix  (request,previous_prefix_result) if prefix else previous_prefix_result
-                function_result = function(request,prefix_result)
+                function_result = function(initator,request,prefix_result)
                 suffix_result   = suffix  (request,function_result) if suffix else function_result
                 return suffix_result
             return RequestWrapper
@@ -73,6 +73,8 @@ def filesize(path):
 
 def streamcopy(from_:IOBase,to_:IOBase,size=-1,chunk_size=163840):
     '''Copies content from one buffer to the other,chunk by chunk
+
+    NOTE: Nor from_ or to_ has to be IOBase objects,it's doable as long as they have read() / write() calls
     
     Args:
         from_ (IOBase): Stream to copy from
@@ -120,7 +122,7 @@ def readstream(request:Request):
     '''
     buffer = BytesIO()
     length = request.headers.get('Content-Length')
-    if not length:raise BadRequestException(400) # this header musn't be empty : https://tools.ietf.org/html/rfc2616#page-33
+    if not length:raise BadRequestException(400,'No Content-Length') # this header musn't be empty : https://tools.ietf.org/html/rfc2616#page-33
     streamcopy(request.rfile,buffer,length)
     buffer.seek(0)
     decoded = buffer.read()
