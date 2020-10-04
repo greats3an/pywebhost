@@ -26,4 +26,5 @@ class wsapp(Session):
 @SessionWrapper()
 def main(self,request:Request,content):
     return wsapp
+print('http://localhost:%s' % server.server_address[1])
 server.serve_forever()

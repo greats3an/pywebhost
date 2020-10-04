@@ -24,7 +24,7 @@ _MAXHEADERS = 100
 _MAXTIMEOUT = 60
 
 class Headers(dict):
-
+    '''Crude implementation of https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html - HTTP Message Headers'''
     def encode(self):
         return str(self).encode()
 
@@ -39,7 +39,7 @@ class Headers(dict):
 
     def __init__(self,response_line='') -> None:
         self.response_line = response_line
-
+    
     def add_header_line(self,header_line : bytes):
         if not isinstance(header_line,str):
             header_line = header_line.decode()
@@ -65,13 +65,18 @@ class Headers(dict):
             if line in (b'\r\n', b'\n', b''):
                 break      
         return headers
-
+    
+    def __getitem__(self, k: str) -> str:
+        '''https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2 - field names are case-insentive'''
+        return super().__getitem__(k.lower())
+    def __setitem__(self, k: str, v: str) -> None:
+        '''https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2 - field names are case-insentive'''
+        super().__setitem__(k.lower(),v)
+    def get(self, key : str, default=None):
+        return super().get(key.lower(),default)
+    
 class Request(StreamRequestHandler):
-    '''`http` module's handler with extra perks & optimization'''
-    """
-    Base properties
-    """
-
+    '''HTTP/1.0 1.1 Request handler - based on `RequestHandler` of `site-package`'''
     wfile : BufferedIOBase
     '''`BufferedIOBase` like I/O for writing messages to sockets'''
     rfile : BufferedIOBase
@@ -92,8 +97,9 @@ class Request(StreamRequestHandler):
     '''Raw TCP socket'''
     close_connection : bool
     '''Whether to preserve the connection (keep-alive one) or not'''
+    
     def __init__(self, request, client_address, server):
-        '''The `server`,which is what instantlizes this handler,must have `__handle__` method
+        '''The `server`,which is what instantlizes this handler,must have `handle` method
         which takes 1 argument (for the handler itself) 
         '''
         self.logger = logging.getLogger('Request')
@@ -256,7 +262,7 @@ class Request(StreamRequestHandler):
                 # An error code has been sent, just exit
                 return
             '''Now,ask the server to process the request'''
-            self.server.__handle__(request=self)
+            self.server.handle(request=self)
             if self.headers_buffer.response_line or self.headers_buffer:
                 raise ResponseNotReady('Response header lines were not flushed')        
             return

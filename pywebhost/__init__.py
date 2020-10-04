@@ -1,14 +1,14 @@
 from http.client import SERVICE_UNAVAILABLE
 from pywebhost.modules import BadRequestException
 import selectors,socketserver,sys
-
+from socket import socket
 from .handler import Request
 from .modules import *
 # from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.1.0'
+__version__ = '1.1.1'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
@@ -54,41 +54,44 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         You can test by typing `http://localhost:1234` into your browser to retrive a glorious error page ((
     '''
     daemon_threads = True
-    def handle_error(self, request : Request, client_address):
-        """Handle an error gracefully.  May be overridden.
+    def handle_error(self, socket_ : socket, client_address : tuple, error : Exception):
+        """Handle an error gracefully. """
+        super().handle_error(socket_,client_address)
 
-        By default,it prints the latest stack trace
-        """
-        super().handle_error(request,client_address)
+    def handle_request_blocking(self):
+        """Handle one request"""
+        try:
+            socket_, client_address = self.get_request()
+        except OSError:
+            return
+        if self.verify_request(socket_, client_address):
+            try:
+                self.process_request(socket_, client_address)
+            except Exception as e:
+                self.handle_error(socket_, client_address , e)
+                self.shutdown_request(socket_)
+            except:
+                self.shutdown_request(socket_)
+                raise
+        else:
+            self.shutdown_request(socket_)
 
+    def serve_forever(self):
+            """Handle one request at a time - Respects self.timeout
 
-    def serve_forever(self, poll_interval=0.5):
-            """Handle one request at a time until shutdown.
-
-            Polls for shutdown every poll_interval seconds. Ignores
-            self.timeout. If you need to do periodic tasks, do them in
-            another thread.
+            The poll function was no longer needed as blocking is no longer an issuse
+            as only threading requests are considered            
             """
             self._BaseServer__is_shut_down.clear()
-            try:
-                # XXX: Consider using another file descriptor or connecting to the
-                # socket to wake this up instead of polling. Polling reduces our
-                # responsiveness to a shutdown request and wastes cpu at all other
-                # times.
-                with selectors.SelectSelector() as selector:
-                    selector.register(self, selectors.EVENT_READ)
-                    while not self._BaseServer__shutdown_request:
-                        ready = selector.select(poll_interval)                        
-                        # bpo-35017: shutdown() called during select(), exit immediately.
-                        if self._BaseServer__shutdown_request:
-                            break
-                        if ready:
-                            self._handle_request_noblock()
-                        self.service_actions()
+            try:                
+                while not self._BaseServer__shutdown_request:                                        
+                    if self._BaseServer__shutdown_request:
+                        break                    
+                    self.handle_request_blocking()                        
             finally:
                 self._BaseServer__is_shut_down.set()
 
-    def __handle__(self, request : Request):
+    def handle(self, request : Request):
         '''
         Maps the request with the `PathMaker`
         
@@ -137,10 +140,6 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         self.paths = PathMaker()
         # A paths dictionary which has `lambda` objects as keys
         self.protocol_version = "HTTP/1.1"
-        # What protocol version to use.
-        # Here's a note:
-        # HTTP 1.1 will automaticly keep the connections alive,so
-        # `close_connection = True` needs to be called once the connection is done
-
+        # What protocol version to use.        
         # Error page format. %(`code`)d %(`message`)s %(`explain`)s are usable
         super().__init__(server_address, Request)
