@@ -274,7 +274,7 @@ def BinaryMessageWrapper(read=True,write=True):
         write (bool, optional): Write the content. Defaults to True.
     '''
     def prefix(request,previous_prefix_result):
-        if not read:return None
+        if not read:return previous_prefix_result
         binary = readstream(request) if previous_prefix_result is None else previous_prefix_result    
         return binary
     def suffix(request,function_result):
@@ -305,7 +305,7 @@ def JSONMessageWrapper(decode=True,encode=True,read=True,write=True):
         write (bool, optional): Write the content. Defaults to True.
     '''
     def prefix(request,previous_prefix_result):
-        if not read:return None
+        if not read:return previous_prefix_result
         string = any2str(readstream(request)) if previous_prefix_result is None else previous_prefix_result
         return string if not decode else json.loads(string)
     def suffix(request,function_result):
@@ -339,7 +339,7 @@ def Base64MessageWrapper(decode=True,encode=True,read=True,write=True):
         write (bool, optional): Write the content. Defaults to True.
     '''    
     def prefix(request,previous_prefix_result):
-        if not read:return None
+        if not read:return previous_prefix_result
         binary = any2str(readstream(request)) if previous_prefix_result is None else previous_prefix_result
         return binary if not decode else base64.b64decode(binary)
     def suffix(request,function_result):

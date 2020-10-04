@@ -276,10 +276,12 @@ class Request(StreamRequestHandler):
             return            
     def handle(self):
         """Handle multiple requests if necessary."""
+        self.log_debug('-- -- Created new HTTP connection')
         self.close_connection = True
         self.handle_one_request()            
         while not self.close_connection:           
             self.handle_one_request()          
+        self.log_debug('Connection closed')
     def send_error(self, code, message=None, explain=None):
         """Send and log an error reply.
 
@@ -416,10 +418,10 @@ class Request(StreamRequestHandler):
 
             {Client Address} [{Time}] "{Verb} {Path} {HTTP Version}" {Message} {User-Agent}
         """
-        try:
+        if hasattr(self,'path'):            
             return f'{self.address_string()} "{self.command} {self.path} {self.base_version_number}" {format % args} {self.useragent_string()}'
-        except Exception:
-            # If an exception ouccred,fallback to another format            
+        else:
+            # Fallback
             return f'{self.address_string()} {format % args}'
     
     def log_error(self, format, *args):
