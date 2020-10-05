@@ -53,14 +53,6 @@ class Session(dict):
             if not self.session_id in _sessions.keys():_sessions[self.session_id] = {}
             _sessions[self.session_id].update(self)
 
-    def onError(self,error):
-        '''What to do when an execption occured
-
-        Args:
-            error (Execption): The said exception
-        '''
-        self.request.send_error(503,explain=str(error))
-
     def onNotFound(self):
         '''What to do when the path cannot be mapped'''
         self.request.send_error(404)
@@ -80,17 +72,15 @@ class Session(dict):
         # try to map the request path to our local path
         self.request_func = Session.mapUri(self.request.path,self)
         self.update(self.get_session()) # loads session dict
-        try:            
-            if not self.request_func:
-                self.onNotFound()
-            else:                
-                self.onOpen()
-                self.request_func_result = self.request_func(self.request,None)
-                self.set_session()            # saves session dict
-                self.onClose()
-            # calls the request func                
-        except Exception as e:
-            self.onError(e)        
+         
+        if not self.request_func:
+            self.onNotFound()
+        else:                
+            self.onOpen()
+            self.request_func_result = self.request_func(self.request,None)
+            self.set_session()            # saves session dict
+            self.onClose()
+        # calls the request func                     
         
 @ModuleWrapper
 def SessionWrapper():
