@@ -6,10 +6,10 @@ from pywebhost import PyWebHost,Request
 
 server = PyWebHost(('',3000))
 
-@server.route('/test')
+@server.route('/streaming_test')
 def test(initator,request: Request, content):
     WriteContentToRequest(request,
-    r'F:\Shared\html\tf2videos\hevydead.m4v'
+    r'some_random_video.mp4'
     ,True,mime_type='video/mp4')
 
 print('http://localhost:%s' % server.server_address[1])

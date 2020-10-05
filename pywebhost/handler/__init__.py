@@ -265,8 +265,6 @@ class Request(StreamRequestHandler):
             '''Now,ask the server to process the request'''
             self.send_header('Connection','keep-alive')
             self.server.handle(request=self)
-            if self.headers_buffer.response_line or self.headers_buffer:
-                raise ResponseNotReady('Response header lines were not flushed')        
             return
         except ResponseNotReady as e:
             self.log_error("Bad Response: %s",e)
