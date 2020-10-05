@@ -216,13 +216,11 @@ def WriteContentToRequest(
         if not (start >= 0 and start < length and end > 0 and end > start and end <= length):
             # Range not satisfiable
             return request.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-        
-        request.clear_header() # re-constructs headers
+
         request.send_response(HTTPStatus.PARTIAL_CONTENT)
-        request.send_header('Accept-Ranges','bytes')
         request.send_header('Content-Length',str(end - start))
         request.send_header('Content-Type',mime_type)
-        request.send_header('Content-Range','bytes %s-%s/%s' % (start,end,length))
+        request.send_header('Content-Range','bytes %s-%s/%s' % (start,end - 1,length))
         request.end_headers()          
 
         stream.seek(start)
@@ -232,7 +230,8 @@ def WriteContentToRequest(
     if partial_acknowledge:
         if length > 0:
             request.send_header('Accept-Ranges','bytes')
-            if send_range(request):return True
+            if send_range(request):                
+                return True
     return send_once(request)
 
 @ModuleWrapper

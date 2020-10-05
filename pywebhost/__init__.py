@@ -8,7 +8,7 @@ from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
@@ -54,16 +54,18 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         You can test by typing `http://localhost:1234` into your browser to retrive a glorious error page ((
     '''
     daemon_threads = True
-    def handle_error(self, socket_ : socket, client_address : tuple, error : Exception):
+    request_queue_size = 10
+    def handle_error(self, socket_ : socket, client_address : tuple, error : Exception = ''):
         """Handle an error gracefully. """
         super().handle_error(socket_,client_address)
 
     def handle_request_blocking(self):
         """Handle one request"""
         try:
-            socket_, client_address = self.get_request()
+            socket_ , client_address = self.get_request()
         except OSError:
             return
+
         if self.verify_request(socket_, client_address):
             try:
                 self.process_request(socket_, client_address)
@@ -104,6 +106,8 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
             except BadRequestException as e:
                 # For Other server-side exceptions,let the client know
                 return request.send_error(e.code,e.explain)
+            except ConnectionAbortedError as e:
+                return request.log_error('Connection Aborted: %s',e)            
             except Exception as e:
                 return request.send_error(SERVICE_UNAVAILABLE,explain='There was an error processing your request:%s'%e)
         # Request's not handled:No URI matched
@@ -127,12 +131,12 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         return f'''
         <head>        
             <title>PyWebHost Error - {self.protocol_version} {code}</title>
-        ''' + '''<style>i {position : fixed;bottom:0%;left : 0%;font-size: 14px;}</style>''' + f'''</head><body>
+        ''' + '''<style>body {font-family: Courier, monospace; } p {position : fixed;bottom:0%;left : 0%;font-size: 14px;}</style>''' + f'''</head><body>
         <div>
-            <center><h1>{code} {message}</h1></center>
-            <hr><center>{explain}</center><hr>
+            <center><h1>{self.protocol_version} {code} {message}<h1></center><hr>
+            <center><h3>{explain}</h3></center>
         </div>
-        <i>PyWebHost {__version__}  on {sys.version}</i>
+        <p>PyWebHost {__version__}  on {sys.version}</p>
         </body>
         '''
 

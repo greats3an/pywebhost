@@ -22,6 +22,7 @@ default_response_code = OK
 _MAXLINE = 65536
 _MAXHEADERS = 100
 _MAXTIMEOUT = 60
+'''Try not to set this value to 0 -- this would cause issuses on some Windows machines'''
 
 class Headers(dict):
     '''Crude implementation of https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html - HTTP Message Headers'''
@@ -262,6 +263,7 @@ class Request(StreamRequestHandler):
                 # An error code has been sent, just exit
                 return
             '''Now,ask the server to process the request'''
+            self.send_header('Connection','keep-alive')
             self.server.handle(request=self)
             if self.headers_buffer.response_line or self.headers_buffer:
                 raise ResponseNotReady('Response header lines were not flushed')        
@@ -277,7 +279,6 @@ class Request(StreamRequestHandler):
             self.close_connection = True
             return
         except ConnectionAbortedError as e:
-            self.log_error("Connection closed UNEXPECTEDLY")
             self.close_connection = True
             return            
     def handle(self):
