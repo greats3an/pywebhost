@@ -269,7 +269,6 @@ class Request(StreamRequestHandler):
         except ResponseNotReady as e:
             self.log_error("Bad Response: %s",e)
             self.send_error(HTTPStatus.SERVICE_UNAVAILABLE)
-            self.close_connection = True
             return
         except socket.timeout as e:
             #a read or a write timed out.  Discard this connection

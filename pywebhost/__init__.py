@@ -8,7 +8,7 @@ from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.1.4'
+__version__ = '1.1.5'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
@@ -106,7 +106,7 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
             except BadRequestException as e:
                 # For Other server-side exceptions,let the client know
                 return request.send_error(e.code,e.explain)
-            except ConnectionAbortedError as e:
+            except ConnectionError as e:
                 return request.log_error('Connection Aborted: %s',e)            
             except Exception as e:
                 return request.send_error(SERVICE_UNAVAILABLE,explain='There was an error processing your request:%s'%e)
