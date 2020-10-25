@@ -1,5 +1,5 @@
 from http.client import OK, ResponseNotReady
-from http.cookies import SimpleCookie
+from http.cookies import Morsel, SimpleCookie
 import logging,socket
 from datetime import datetime
 from socketserver import StreamRequestHandler
@@ -376,8 +376,8 @@ class Request(StreamRequestHandler):
             elif value.lower() == 'keep-alive':
                 self.close_connection = False
 
-    def send_cookies(self,key,value):
-        '''Sets a cookie'''
+    def send_cookies(self,key,value : Morsel):
+        '''Sets a cookie'''    
         self.cookies_buffer[key]=value
 
     def end_headers(self):

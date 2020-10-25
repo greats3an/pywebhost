@@ -1,20 +1,23 @@
+from http.cookies import Morsel
 from random import randrange
+from .. import PathMaker
 from ..handler import Request
 from . import ModuleWrapper, WriteContentToRequest, writestream
 import time,random
 
 from hashlib import md5
 SESSION_KEY = 'sess_'
-
+SESSION_EXPIRE = 365 * 24 * 3600 # Expires in 1 year
 _sessions = {}
 class Session(dict):
-
-    @staticmethod
-    def mapUri(url,object_):
+    
+    def mapUri(self,url):
         '''From the request path to local method'''
+        if self.paths.hasitem(url):
+            return self.paths[url]
         classpath = url.replace('/','_')
-        if hasattr(object_,classpath):
-            return getattr(object_,classpath)
+        if hasattr(self,classpath):
+            return getattr(self,classpath)
 
     @property
     def new_uid(self):
@@ -33,7 +36,8 @@ class Session(dict):
         session_id = self.request.cookies.get(SESSION_KEY) or self.request.cookies_buffer.get(SESSION_KEY)
         if not session_id:
             session_id = self.new_uid
-            self.request.send_cookies(SESSION_KEY,session_id)
+            self.request.cookies_buffer[SESSION_KEY] = session_id            
+            self.request.cookies_buffer[SESSION_KEY]['expires']  = SESSION_EXPIRE
             return session_id
         return session_id.value
     
@@ -57,9 +61,13 @@ class Session(dict):
         '''What to do when the path cannot be mapped'''
         self.request.send_error(404)
 
+    def onCreate(self):
+        '''What to do when the session starts,i.e set request mapping'''
+        pass
+
     def onOpen(self):
-        '''What to do when the session starts'''
-        self.request.send_response(200)
+        '''What to do when the session is ready to preform response'''    
+        pass
 
     def onClose(self):
         '''What to do when the session ends'''
@@ -68,18 +76,19 @@ class Session(dict):
     def __init__(self,request : Request,use_session_id=True) -> None:           
         super().__init__()
         self.request = request    
-        self.use_session_id = use_session_id
-        # try to map the request path to our local path
-        self.request_func = Session.mapUri(self.request.path,self)
+        self.use_session_id = use_session_id        
         self.update(self.get_session()) # loads session dict
-         
+        self.paths = PathMaker()               
+        self.onCreate()
+        # try to map the request path to our local path
+        self.request_func = self.mapUri(self.request.path)
         if not self.request_func:
             self.onNotFound()
-        else:                
+        else:
             self.onOpen()
-            self.request_func_result = self.request_func(self.request,None)
-            self.set_session()            # saves session dict
-            self.onClose()
+            self.request_func_result = self.request_func(self,self.request,None)
+        self.set_session()            # saves session dict
+        self.onClose()
         # calls the request func                     
         
 @ModuleWrapper

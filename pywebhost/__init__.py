@@ -8,7 +8,7 @@ from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.1.5'
+__version__ = '1.1.6'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
@@ -33,6 +33,10 @@ class PathMaker(dict):
         if not isinstance(pattern,str):raise Exception('The keys & values must be regexes string')
         super().__setitem__(pattern,value)
 
+    def hasitem(self,key):
+        for pattern in list(self.keys())[::-1]: # LIFO
+            if fullmatch(pattern,key):return True
+
     def __getitem__(self, key):
         '''Iterates all keys to find matching one
 
@@ -40,7 +44,7 @@ class PathMaker(dict):
         '''
         for pattern in list(self.keys())[::-1]: # LIFO
             if fullmatch(pattern,key):
-                yield super().__getitem__(pattern)
+                return super().__getitem__(pattern)
 
 class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
     '''
@@ -99,9 +103,9 @@ class PyWebHost(socketserver.ThreadingMixIn, socketserver.TCPServer,):
         
         The `request` is provided to the router
         '''
-        for method in self.paths[request.path]:
+        if self.paths.hasitem(request.path):
             try:
-                return method(self,request,None)
+                return self.paths[request.path](self,request,None)
                 # Succeed,end this handle call
             except BadRequestException as e:
                 # For Other server-side exceptions,let the client know
