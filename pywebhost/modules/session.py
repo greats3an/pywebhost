@@ -14,11 +14,11 @@ class Session(dict):
     def mapUri(self,url):
         '''From the request path to local method'''
         if self.paths.hasitem(url):
-            return self.paths[url]
+            return (self.paths[url],True)
         classpath = url.replace('/','_')
         if hasattr(self,classpath):
-            return getattr(self,classpath)
-
+            return (getattr(self,classpath),False)
+        return (None,None)
     @property
     def new_uid(self):
         '''Generates new uid'''
@@ -81,12 +81,13 @@ class Session(dict):
         self.paths = PathMaker()               
         self.onCreate()
         # try to map the request path to our local path
-        self.request_func = self.mapUri(self.request.path)
+        self.request_func,self.rfunc_from_paths = self.mapUri(self.request.path)
         if not self.request_func:
             self.onNotFound()
         else:
             self.onOpen()
-            self.request_func_result = self.request_func(self,self.request,None)
+            if self.rfunc_from_paths:self.request_func_result = self.request_func(self,self.request,None)
+            else:self.request_func_result = self.request_func(self.request,None)
         self.set_session()            # saves session dict
         self.onClose()
         # calls the request func                     
