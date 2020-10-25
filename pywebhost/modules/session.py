@@ -7,7 +7,7 @@ import time,random
 
 from hashlib import md5
 SESSION_KEY = 'sess_'
-SESSION_EXPIRE = 365 * 24 * 3600 # Expires in 1 year
+SESSION_EXPIRE = 365 * 24 * 3600 # Expires in 1 year by default
 _sessions = {}
 class Session(dict):
     
@@ -36,8 +36,7 @@ class Session(dict):
         session_id = self.request.cookies.get(SESSION_KEY) or self.request.cookies_buffer.get(SESSION_KEY)
         if not session_id:
             session_id = self.new_uid
-            self.request.cookies_buffer[SESSION_KEY] = session_id            
-            self.request.cookies_buffer[SESSION_KEY]['expires']  = SESSION_EXPIRE
+            self.request.send_cookies(SESSION_KEY,session_id,expires=SESSION_EXPIRE)            
             return session_id
         return session_id.value
     

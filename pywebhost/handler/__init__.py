@@ -376,9 +376,14 @@ class Request(StreamRequestHandler):
             elif value.lower() == 'keep-alive':
                 self.close_connection = False
 
-    def send_cookies(self,key,value : Morsel):
-        '''Sets a cookie'''    
+    def send_cookies(self,key,value : Morsel,**kwargs):
+        '''Sets a cookie
+        - Morsel attributes can be set by:
+            
+            send_cookies('session','c001code',expires=3600)
+        '''    
         self.cookies_buffer[key]=value
+        for k in kwargs:self.cookies_buffer[key][k] = kwargs[k]
 
     def end_headers(self):
         """Adds the cookies and blank line ending of the MIME headers to the buffer,
