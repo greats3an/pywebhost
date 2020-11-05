@@ -198,10 +198,13 @@ class WebsocketSession(Session):
         (which is the PAYLOAD of the Frame).Note that disabling `raw_frames` will also disable the 
         concatnation of `FIN=0` packets.
         '''        
-        super().__init__(request, *a,**k)
         self.raw_frames = raw_frames
         self.keep_alive, self.did_handshake = True, False
         self.__buffer = bytearray()
+        super().__init__(request, *a,**k)
+        
+
+    def onCreate(self):
         # Adds ourself into the server list
         # If the list is not present in the server,create it otherwise
         if not hasattr(self.request.server, 'websockets'):
@@ -209,7 +212,7 @@ class WebsocketSession(Session):
         self.request.raw_request.settimeout(None)
         # no timeouts
         self.request.server.websockets.append(self)
-        
+
     def onNotFound(self):
         '''Useless for WS connections'''
         pass

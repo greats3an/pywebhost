@@ -122,11 +122,10 @@ def readstream(request:Request):
     '''
     buffer = BytesIO()
     length = request.headers.get('Content-Length')
-    if not length:raise BadRequestException(400,'No Content-Length') # this header musn't be empty : https://tools.ietf.org/html/rfc2616#page-33
+    if not length:return b'' # this header musn't be empty : https://tools.ietf.org/html/rfc2616#page-33
     streamcopy(request.rfile,buffer,length)
     buffer.seek(0)
-    decoded = buffer.read()
-    return decoded
+    return buffer.read()
 
 def writestream(request:Request,data):
     '''Writes content to client
