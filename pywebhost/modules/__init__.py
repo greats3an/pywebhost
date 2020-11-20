@@ -194,6 +194,9 @@ def WriteContentToRequest(
         # str - file path
         length = filesize(object) if length < 0 else length
         stream = open(object,'rb')
+    elif isinstance(object,(bytes,bytearray)):
+        length = len(object)
+        stream = BytesIO(object)
     elif hasattr(object,'read'):
         # readable - IO-like objects
         stream = object
