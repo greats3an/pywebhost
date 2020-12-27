@@ -1,9 +1,5 @@
 import setuptools,pywebhost
 
-requirements = [
-    'coloredlogs' # for some fancy logs
-]
-
 with open("README.md", "r",encoding='utf-8') as fh:
     long_description = fh.read()
 
@@ -21,6 +17,6 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
-    ],install_requires=requirements,
+    ],install_requires=[],
     python_requires='>=3.6',
 )

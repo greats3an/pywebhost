@@ -83,7 +83,7 @@ class Session(dict):
         self.request_func,self.rfunc_from_paths = self.mapUri(self.request.path)
         if not self.request_func:
             self.request_func=self.onNotFound
-        self.onOpen(request,None)
+
         if self.rfunc_from_paths:self.request_func_result = self.request_func(self,self.request,None)
         # dict-mapped objects
         else:self.request_func_result = self.request_func(self.request,None)            

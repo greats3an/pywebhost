@@ -204,7 +204,7 @@ class WebsocketSession(Session):
         super().__init__(request, *a,**k)
         
 
-    def onCreate(self):
+    def onCreate(self,request=None,content=None):
         # Adds ourself into the server list
         # If the list is not present in the server,create it otherwise
         if not hasattr(self.request.server, 'websockets'):
@@ -213,11 +213,11 @@ class WebsocketSession(Session):
         # no timeouts
         self.request.server.websockets.append(self)
 
-    def onNotFound(self):
+    def onNotFound(self,request=None,content=None):
         '''Useless for WS connections'''
         pass
 
-    def onOpen(self):
+    def onOpen(self,request=None,content=None):
         '''Decides what to do once the handshake was perfromed'''
         pass
 
@@ -325,7 +325,7 @@ class WebsocketSession(Session):
         # kicks ourself out
         self.onClose()
 
-    def onClose(self):
+    def onClose(self,request=None,content=None):        
         pass
 
     def __websocket_constructframe(self, data: WebsocketFrame) -> bytearray:
