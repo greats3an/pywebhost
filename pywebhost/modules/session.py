@@ -56,19 +56,19 @@ class Session(dict):
             if not self.session_id in _sessions.keys():_sessions[self.session_id] = {}
             _sessions[self.session_id].update(self)
 
-    def onNotFound(self):
+    def onNotFound(self,request : Request=None,previous_prefix_result=None):
         '''What to do when the path cannot be mapped'''
         self.request.send_error(404)
 
-    def onCreate(self):
-        '''What to do when the session starts,i.e set request mapping'''
+    def onCreate(self,request : Request=None,previous_prefix_result=None):
+        '''What to do when the session starts,e.g. set request mapping'''
         pass
 
-    def onOpen(self):
+    def onOpen(self,request : Request=None,previous_prefix_result=None):
         '''What to do when the session is ready to preform response'''    
         pass
 
-    def onClose(self):
+    def onClose(self,request : Request=None,previous_prefix_result=None):
         '''What to do when the session ends'''
         pass    
 
@@ -78,17 +78,18 @@ class Session(dict):
         self.use_session_id = use_session_id        
         self.update(self.get_session()) # loads session dict
         self.paths = PathMaker()               
-        self.onCreate()
+        self.onCreate(request,None)
         # try to map the request path to our local path
         self.request_func,self.rfunc_from_paths = self.mapUri(self.request.path)
         if not self.request_func:
-            self.onNotFound()
-        else:
-            self.onOpen()
-            if self.rfunc_from_paths:self.request_func_result = self.request_func(self,self.request,None)
-            else:self.request_func_result = self.request_func(self.request,None)
+            self.request_func=self.onNotFound
+        self.onOpen(request,None)
+        if self.rfunc_from_paths:self.request_func_result = self.request_func(self,self.request,None)
+        # dict-mapped objects
+        else:self.request_func_result = self.request_func(self.request,None)            
+        # native objects
         self.set_session()            # saves session dict
-        self.onClose()
+        self.onClose(request,None)
         # calls the request func                     
         
 @ModuleWrapper
