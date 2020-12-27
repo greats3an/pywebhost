@@ -56,19 +56,19 @@ class Session(dict):
             if not self.session_id in _sessions.keys():_sessions[self.session_id] = {}
             _sessions[self.session_id].update(self)
 
-    def onNotFound(self,request : Request=None,previous_prefix_result=None):
+    def onNotFound(self,request : Request=None,content=None):
         '''What to do when the path cannot be mapped'''
         self.request.send_error(404)
 
-    def onCreate(self,request : Request=None,previous_prefix_result=None):
+    def onCreate(self,request : Request=None,content=None):
         '''What to do when the session starts,e.g. set request mapping'''
         pass
 
-    def onOpen(self,request : Request=None,previous_prefix_result=None):
+    def onOpen(self,request : Request=None,content=None):
         '''What to do when the session is ready to preform response'''    
         pass
 
-    def onClose(self,request : Request=None,previous_prefix_result=None):
+    def onClose(self,request : Request=None,content=None):
         '''What to do when the session ends'''
         pass    
 
