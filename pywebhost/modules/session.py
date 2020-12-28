@@ -80,14 +80,14 @@ class Session(dict):
         self.paths = PathMaker()               
         self.onCreate(request,None)
         # try to map the request path to our local path
-        self.request_func,self.rfunc_from_paths = self.mapUri(self.request.path)
-        if not self.request_func:
-            self.request_func=self.onNotFound
+        request_func,rfunc_from_paths = self.mapUri(self.request.path)
+        if not request_func:
+            request_func=self.onNotFound
 
-        if self.rfunc_from_paths and not hasattr(self,self.request_func.__name__):
-            self.request_func_result = self.request_func(self,self.request,None)
+        if rfunc_from_paths and not request_func.__self__ is self:
+            self.request_func_result = request_func(self,self.request,None)
         # dict-mapped objects outside current class
-        else:self.request_func_result = self.request_func(self.request,None)            
+        else:self.request_func_result = request_func(self.request,None)            
         # native objects
         self.set_session()            # saves session dict
         self.onClose(request,None)
