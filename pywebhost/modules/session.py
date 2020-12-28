@@ -84,7 +84,7 @@ class Session(dict):
         if not self.request_func:
             self.request_func=self.onNotFound
 
-        if self.rfunc_from_paths and not hasattr(self,self.request_func):
+        if self.rfunc_from_paths and not hasattr(self,self.request_func.__name__):
             self.request_func_result = self.request_func(self,self.request,None)
         # dict-mapped objects outside current class
         else:self.request_func_result = self.request_func(self.request,None)            
