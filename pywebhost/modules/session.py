@@ -8,7 +8,7 @@ import time,random
 from hashlib import md5
 SESSION_KEY = 'sess_'
 SESSION_EXPIRE = 365 * 24 * 3600 # Expires in 1 year by default
-_sessions = {}
+_sessions = dict()
 class Session(dict):
     
     def mapUri(self,url):
@@ -25,6 +25,11 @@ class Session(dict):
         str_ = '%sDamn%sI%sOughtTorethinkthis' % (SESSION_KEY,time.time() * 1e6,randrange(1e7,1e8-1))
         return md5(str_.encode()).hexdigest()
 
+    def set_session_id(self,**cookie_args):
+        session_id = self.new_uid
+        self.request.send_cookies(SESSION_KEY,session_id,expires=SESSION_EXPIRE,**cookie_args)            
+        return session_id
+
     @property
     def session_id(self):
         '''The UID of the session
@@ -35,9 +40,7 @@ class Session(dict):
         if not self.use_session_id:return None
         session_id = self.request.cookies.get(SESSION_KEY) or self.request.cookies_buffer.get(SESSION_KEY)
         if not session_id:
-            session_id = self.new_uid
-            self.request.send_cookies(SESSION_KEY,session_id,expires=SESSION_EXPIRE)            
-            return session_id
+            return None    
         return session_id.value
     
     def get_session(self):
@@ -50,11 +53,14 @@ class Session(dict):
             if not self.session_id in _sessions.keys():_sessions[self.session_id] = {}
             return _sessions[self.session_id]
         return {}
+
     def set_session(self):
         '''Saves session dictionary by updating it with our values,may be overridden'''
         if self.session_id:
             if not self.session_id in _sessions.keys():_sessions[self.session_id] = {}
             _sessions[self.session_id].update(self)
+            return True
+        return False
 
     def onNotFound(self,request : Request=None,content=None):
         '''What to do when the path cannot be mapped'''
