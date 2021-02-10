@@ -407,10 +407,12 @@ class Request(StreamRequestHandler):
             code = code.value
         self.log_debug('"%s" %s',self.requestline, str(code))
 
+    @property    
     def address_string(self):
         """Return the client address."""
         return self.client_address[0] + ':' + str(self.client_address[1])
 
+    @property
     def useragent_string(self):
         """Returns the client UA header,if applicable"""
         return self.headers.get('User-Agent')
