@@ -430,10 +430,10 @@ class Request(StreamRequestHandler):
             {Client Address} [{Time}] "{Verb} {Path} {HTTP Version}" {Message} {User-Agent}
         """
         if hasattr(self,'path'):            
-            return f'{self.address_string()} "{self.command} {self.path} {self.base_version_number}" {format % args} {self.useragent_string()}'
+            return f'{self.address_string} "{self.command} {self.path} {self.base_version_number}" {format % args} {self.useragent_string}'
         else:
             # Fallback
-            return f'{self.address_string()} {format % args}'
+            return f'{self.address_string} {format % args}'
     
     def log_error(self, format, *args):
         """Log an error.
