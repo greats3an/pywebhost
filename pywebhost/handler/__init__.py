@@ -275,7 +275,7 @@ class Request(StreamRequestHandler):
             # self.log_error("Request timed out: %s", e)
             self.close_connection = True
             return
-        except ConnectionAbortedError as e:
+        except ConnectionAbortedError and ConnectionResetError as e:
             self.close_connection = True
             return            
     def handle(self):
