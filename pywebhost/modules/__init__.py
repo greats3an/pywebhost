@@ -278,11 +278,11 @@ def BinaryMessageWrapper(read=True,write=True):
         if not read:return previous_prefix_result
         binary = readstream(request) if previous_prefix_result is None else previous_prefix_result    
         return binary
-    def suffix(request,function_result):
-        if function_result:
-            binary = any2bytes(function_result)
-            if write:writestream(request,binary)
-            return function_result
+    def suffix(request,function_result):        
+        binary = any2bytes(function_result)
+        if write:
+            writestream(request,binary)
+        return function_result
         return bytearray()
     return prefix , suffix
 
@@ -310,14 +310,12 @@ def JSONMessageWrapper(decode=True,encode=True,read=True,write=True):
         string = any2str(readstream(request)) if previous_prefix_result is None else previous_prefix_result
         return string if not decode else json.loads(string)
     def suffix(request,function_result):
-        if function_result and encode:
+        string = function_result
+        if encode:
             string = json.dumps(function_result)
-            if write:writestream(request,string)
-            return string
-        elif function_result:
-            return function_result
-        else:
-            return None
+        if write:
+            writestream(request,string)
+        return string
     return prefix , suffix
 
 @ModuleWrapper
@@ -344,13 +342,10 @@ def Base64MessageWrapper(decode=True,encode=True,read=True,write=True):
         binary = any2str(readstream(request)) if previous_prefix_result is None else previous_prefix_result
         return binary if not decode else base64.b64decode(binary)
     def suffix(request,function_result):
-        if function_result:
-            binary = function_result.encode()
-            if encode:base64.b64encode(binary)
-            if write:writestream(request,binary)
-            return binary
-        elif function_result:
-            return function_result
-        else:
-            return None
+        binary = function_result.encode()
+        if encode:
+            binary = base64.b64encode(binary)
+        if write:
+            writestream(request,binary)
+        return binary   
     return prefix , suffix
