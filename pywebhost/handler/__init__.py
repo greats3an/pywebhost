@@ -283,8 +283,11 @@ class Request(StreamRequestHandler):
         self.log_debug('-- -- Created new HTTP connection')
         self.close_connection = True
         self.handle_one_request()            
-        while not self.close_connection:           
-            self.handle_one_request()          
+        try:
+            while not self.close_connection:           
+                self.handle_one_request()          
+        except Exception as e:
+            return self.log_debug('Connection closed %s' % e)
         self.log_debug('Connection closed')
     def send_error(self, code, message=None, explain=None):
         """Send and log an error reply.

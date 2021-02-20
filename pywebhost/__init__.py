@@ -8,7 +8,7 @@ from .modules import *
 from re import fullmatch
 from http import HTTPStatus
 
-__version__ = '1.2.8.3'
+__version__ = '1.2.8.4'
 
 class PathMaker(dict):
     '''For storing and handling path mapping
